@@ -298,15 +298,15 @@ def train(train_features, train_labels, val_features, val_labels, network, confi
                 train_gt = np.concatenate((np.array(train_gt, int), np.array(y_true, int)))
             print("EPOCH: {}/{}".format(e + 1, config['epochs']),
                   "Train Loss: {:.4f}".format(np.mean(train_losses)),
-                  "Train Acc: {:.4f}".format(jaccard_score(train_gt, train_preds, average='weighted')),
-                  "Train Prec: {:.4f}".format(precision_score(train_gt, train_preds, average='weighted')),
-                  "Train Rcll: {:.4f}".format(recall_score(train_gt, train_preds, average='weighted')),
-                  "Train F1: {:.4f}".format(f1_score(train_gt, train_preds, average='weighted')),
+                  "Train Acc: {:.4f}".format(jaccard_score(train_gt, train_preds, average='macro')),
+                  "Train Prec: {:.4f}".format(precision_score(train_gt, train_preds, average='macro')),
+                  "Train Rcll: {:.4f}".format(recall_score(train_gt, train_preds, average='macro')),
+                  "Train F1: {:.4f}".format(f1_score(train_gt, train_preds, average='macro')),
                   "Val Loss: {:.4f}".format(np.mean(val_losses)),
-                  "Val Acc: {:.4f}".format(jaccard_score(val_gt, val_preds, average='weighted')),
-                  "Val Prec: {:.4f}".format(precision_score(val_gt, val_preds, average='weighted')),
-                  "Val Rcll: {:.4f}".format(recall_score(val_gt, val_preds, average='weighted')),
-                  "Val F1: {:.4f}".format(f1_score(val_gt, val_preds, average='weighted')))
+                  "Val Acc: {:.4f}".format(jaccard_score(val_gt, val_preds, average='macro')),
+                  "Val Prec: {:.4f}".format(precision_score(val_gt, val_preds, average='macro')),
+                  "Val Rcll: {:.4f}".format(recall_score(val_gt, val_preds, average='macro')),
+                  "Val F1: {:.4f}".format(f1_score(val_gt, val_preds, average='macro')))
 
             if config['print_counts']:
                 y_train = np.bincount(train_preds)
