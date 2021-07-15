@@ -259,5 +259,5 @@ if __name__ == '__main__':
     create_hhar_dataset('../data/raw/hhar').to_csv(
         '../data/hhar_data.csv', index=False, header=False)
     # rwhar
-    create_rwhar_dataset('../data/raw/rwhar').to_csv(
+    create_rwhar_dataset('../data/raw/rwhar/').to_csv(
         '../data/rwhar_data.csv', index=False, header=False)
