@@ -231,7 +231,6 @@ def train(train_features, train_labels, val_features, val_labels, network, confi
                                  batch_size=config['batch_size'],
                                  num_workers=2,
                                  shuffle=False,
-                                 pin_memory=True
                                  )
         for i, (x, y) in enumerate(trainloader):
             inputs, targets = x.to(config['gpu']), y.to(config['gpu'])
@@ -269,7 +268,6 @@ def train(train_features, train_labels, val_features, val_labels, network, confi
                                batch_size=config['batch_size'],
                                num_workers=2,
                                shuffle=False,
-                               pin_memory=True
                                )
 
         # set network to eval mode
