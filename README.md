@@ -1,3 +1,6 @@
+# Improving Deep Learning for HAR with shallow LSTMs (ISWC 21' Note paper)
+
+
 # Deep Learning for HAR (ISWC 21' Tutorial)
 
 ## Installing PyAV
@@ -11,3 +14,4 @@ conda install cython
 cd PyAV
 ./scripts/build-deps
 make
+  
