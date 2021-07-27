@@ -94,12 +94,13 @@ def preprocess_data(data, dataset, cutoff_sequence_train, cutoff_sequence_test, 
         val = data[(data.iloc[:, 0] <= cutoff_sequence_test) & (data.iloc[:, 0] > cutoff_sequence_train)]
         test = data[(data.iloc[:, 0] > cutoff_sequence_test)]
 
-    X_train, X_val, X_test = train.iloc[:, :-2], val.iloc[:, :-2], test.iloc[:, :-2]
     if dataset == 'wetlab' and pred_type == 'actions':
+        X_train, X_val, X_test = train.iloc[:, :-2], val.iloc[:, :-2], test.iloc[:, :-2]
         y_train = adjust_labels(train.iloc[:, -2], dataset, pred_type).astype(int)
         y_val = adjust_labels(val.iloc[:, -2], dataset, pred_type).astype(int)
         y_test = adjust_labels(test.iloc[:, -2], dataset, pred_type).astype(int)
     else:
+        X_train, X_val, X_test = train.iloc[:, :-1], val.iloc[:, :-1], test.iloc[:, :-1]
         y_train = adjust_labels(train.iloc[:, -1], dataset, pred_type).astype(int)
         y_val = adjust_labels(val.iloc[:, -1], dataset, pred_type).astype(int)
         y_test = adjust_labels(test.iloc[:, -1], dataset, pred_type).astype(int)
