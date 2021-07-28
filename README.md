@@ -13,9 +13,7 @@ This is the official GitHub page of the note paper publication "Improving Deep L
 ## (Re-)running experiments
 
 In order to rerun experiments, one needs to first 
-# Deep Learning for HAR (ISWC 21' Tutorial)
 
-coming soon
 
 ## Installing PyAV
 - For Linux: 
