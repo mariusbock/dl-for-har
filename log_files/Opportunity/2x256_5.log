@@ -1,0 +1,59 @@
+Applied settings: 
+Namespace(adj_lr=False, adj_lr_patience=2, batch_norm=False, batch_size=100, conv_block_type='normal', cutoff_test=30, cutoff_train=4, dataset='opportunity', dilation=1, drop_prob=0.5, early_stopping=False, epochs=30, es_patience=5, filter_width=5, gpu='cuda:0', include_null=True, logging=True, loss='cross-entropy', lr=0.0001, means_and_stds=False, nb_conv_blocks=2, nb_filters=64, nb_layers_lstm=2, nb_units_lstm=256, network='deepconvlstm', optimizer='adam', plot_gradient=False, pool_kernel_width=2, pool_type='max', pooling=False, pred_type='gestures', print_counts=False, print_freq=100, reduce_layer=False, reduce_layer_output=8, save_preds=False, seed=5, size_sss=0.6, splits_sss=10, sw_length=24.0, sw_overlap=50.0, sw_unit='units', use_weights=False, valid_type='normal', verbose=False, weight_decay=1e-06, weights_init='xavier_normal')
+Loading data...
+Processing dataset files ...
+Final datasets with size: | train (497014, 113) | val (118750, 113) | test (0, 0) | 
+ ..from file data/opportunity_data.csv
+ ..reading instances: train (497014, 113), val (118750, 113), test (0, 0)
+(41416, 24, 113)
+Number of Parameters: 
+8262738
+EPEPOCH: 1/30 Train Loss: 1.4058 Train Acc: 0.0866 Train Prec: 0.1758 Train Rcll: 0.2013 Train F1: 0.1229 Val Loss: 1.5398 Val Acc: 0.0646 Val Prec: 0.1508 Val Rcll: 0.2012 Val F1: 0.099EPEPOCH: 2/30 Train Loss: 0.9502 Train Acc: 0.5493 Train Prec: 0.7832 Train Rcll: 0.7033 Train F1: 0.6611 Val Loss: 0.8426 Val Acc: 0.5353 Val Prec: 0.7340 Val Rcll: 0.7056 Val F1: 0.638EPEPOCH: 3/30 Train Loss: 0.6573 Train Acc: 0.6336 Train Prec: 0.7843 Train Rcll: 0.7831 Train F1: 0.7635 Val Loss: 0.7477 Val Acc: 0.6104 Val Prec: 0.7619 Val Rcll: 0.7668 Val F1: 0.737EPEPOCH: 4/30 Train Loss: 0.5580 Train Acc: 0.6769 Train Prec: 0.8216 Train Rcll: 0.7969 Train F1: 0.7955 Val Loss: 0.6758 Val Acc: 0.6327 Val Prec: 0.7790 Val Rcll: 0.7751 Val F1: 0.752EPEPOCH: 5/30 Train Loss: 0.4738 Train Acc: 0.7225 Train Prec: 0.8610 Train Rcll: 0.8232 Train F1: 0.8305 Val Loss: 0.6232 Val Acc: 0.6565 Val Prec: 0.8164 Val Rcll: 0.7823 Val F1: 0.772EPEPOCH: 6/30 Train Loss: 0.4519 Train Acc: 0.7263 Train Prec: 0.8613 Train Rcll: 0.8275 Train F1: 0.8322 Val Loss: 0.6600 Val Acc: 0.6329 Val Prec: 0.8108 Val Rcll: 0.7599 Val F1: 0.755EPOCH: 7/30 Train Loss: 0.6234 Train Acc: 0.2221 Train Prec: 0.5656 Train Rcll: 0.2624 Train F1: 0.3002 Val Loss: 0.5706 Val Acc: 0.1504 Val Prec: 0.4190 Val Rcll: 0.1849 Val F1: 0.2144
+EPOCH: 8/30 Train Loss: 0.5472 Train Acc: 0.3442 Train Prec: 0.7596 Train Rcll: 0.3976 Train F1: 0.4711 Val Loss: 0.5192 Val Acc: 0.2090 Val Prec: 0.4201 Val Rcll: 0.2657 Val F1: 0.2966
+EPOCH: 9/30 Train Loss: 0.4821 Train Acc: 0.3946 Train Prec: 0.7465 Train Rcll: 0.4524 Train F1: 0.5358 Val Loss: 0.5011 Val Acc: 0.2401 Val Prec: 0.4809 Val Rcll: 0.2882 Val F1: 0.3340
+EPOCH: 10/30 Train Loss: 0.4279 Train Acc: 0.4400 Train Prec: 0.7565 Train Rcll: 0.5115 Train F1: 0.5881 Val Loss: 0.4566 Val Acc: 0.2665 Val Prec: 0.5281 Val Rcll: 0.3247 Val F1: 0.3688
+EPOCH: 11/30 Train Loss: 0.3918 Train Acc: 0.4792 Train Prec: 0.7633 Train Rcll: 0.5550 Train F1: 0.6218 Val Loss: 0.4555 Val Acc: 0.2930 Val Prec: 0.5411 Val Rcll: 0.3583 Val F1: 0.3982
+EPOCH: 12/30 Train Loss: 0.3700 Train Acc: 0.5184 Train Prec: 0.7944 Train Rcll: 0.6013 Train F1: 0.6645 Val Loss: 0.4340 Val Acc: 0.2985 Val Prec: 0.5298 Val Rcll: 0.3635 Val F1: 0.4093
+EPOCH: 13/30 Train Loss: 0.3363 Train Acc: 0.5499 Train Prec: 0.7901 Train Rcll: 0.6342 Train F1: 0.6943 Val Loss: 0.4191 Val Acc: 0.2970 Val Prec: 0.5241 Val Rcll: 0.3658 Val F1: 0.4120
+EPOCH: 14/30 Train Loss: 0.3169 Train Acc: 0.5989 Train Prec: 0.8240 Train Rcll: 0.6825 Train F1: 0.7379 Val Loss: 0.4173 Val Acc: 0.3072 Val Prec: 0.5786 Val Rcll: 0.3897 Val F1: 0.4253
+EPOCH: 15/30 Train Loss: 0.2914 Train Acc: 0.5320 Train Prec: 0.8206 Train Rcll: 0.6007 Train F1: 0.6773 Val Loss: 0.4297 Val Acc: 0.2986 Val Prec: 0.5860 Val Rcll: 0.3692 Val F1: 0.4157
+EPOCH: 16/30 Train Loss: 0.2825 Train Acc: 0.5744 Train Prec: 0.8302 Train Rcll: 0.6597 Train F1: 0.7204 Val Loss: 0.4170 Val Acc: 0.2958 Val Prec: 0.5880 Val Rcll: 0.3779 Val F1: 0.4158
+EPOCH: 17/30 Train Loss: 0.2745 Train Acc: 0.5919 Train Prec: 0.7993 Train Rcll: 0.7051 Train F1: 0.7367 Val Loss: 0.4076 Val Acc: 0.3214 Val Prec: 0.5538 Val Rcll: 0.4293 Val F1: 0.4558
+EPOCH: 18/30 Train Loss: 0.2661 Train Acc: 0.6482 Train Prec: 0.8508 Train Rcll: 0.7355 Train F1: 0.7818 Val Loss: 0.3902 Val Acc: 0.3437 Val Prec: 0.5589 Val Rcll: 0.4463 Val F1: 0.4744
+EPOCH: 19/30 Train Loss: 0.2517 Train Acc: 0.6318 Train Prec: 0.8409 Train Rcll: 0.7277 Train F1: 0.7688 Val Loss: 0.4084 Val Acc: 0.3296 Val Prec: 0.5634 Val Rcll: 0.4215 Val F1: 0.4629
+EPEPOCH: 20/30 Train Loss: 0.1695 Train Acc: 0.9093 Train Prec: 0.9525 Train Rcll: 0.9508 Train F1: 0.9513 Val Loss: 0.4872 Val Acc: 0.7965 Val Prec: 0.8881 Val Rcll: 0.8839 Val F1: 0.882EPOCH: 21/30 Train Loss: 0.2280 Train Acc: 0.6781 Train Prec: 0.8653 Train Rcll: 0.7636 Train F1: 0.8054 Val Loss: 0.3996 Val Acc: 0.3478 Val Prec: 0.5784 Val Rcll: 0.4356 Val F1: 0.4843
+EPOCH: 22/30 Train Loss: 0.2221 Train Acc: 0.6821 Train Prec: 0.8745 Train Rcll: 0.7644 Train F1: 0.8080 Val Loss: 0.3933 Val Acc: 0.3507 Val Prec: 0.6026 Val Rcll: 0.4431 Val F1: 0.4879
+EPOCH: 23/30 Train Loss: 0.2309 Train Acc: 0.7238 Train Prec: 0.8674 Train Rcll: 0.8174 Train F1: 0.8380 Val Loss: 0.3878 Val Acc: 0.3576 Val Prec: 0.5642 Val Rcll: 0.4689 Val F1: 0.4979
+EPOCH: 24/30 Train Loss: 0.2090 Train Acc: 0.7442 Train Prec: 0.8891 Train Rcll: 0.8231 Train F1: 0.8516 Val Loss: 0.4019 Val Acc: 0.3465 Val Prec: 0.5689 Val Rcll: 0.4520 Val F1: 0.4847
+EPOCH: 25/30 Train Loss: 0.1977 Train Acc: 0.7402 Train Prec: 0.8969 Train Rcll: 0.8151 Train F1: 0.8491 Val Loss: 0.4180 Val Acc: 0.3414 Val Prec: 0.5890 Val Rcll: 0.4313 Val F1: 0.4756
+EPOCH: 26/30 Train Loss: 0.1862 Train Acc: 0.7538 Train Prec: 0.9026 Train Rcll: 0.8238 Train F1: 0.8581 Val Loss: 0.4134 Val Acc: 0.3507 Val Prec: 0.6178 Val Rcll: 0.4407 Val F1: 0.4880
+EPEPOCH: 27/30 Train Loss: 0.0959 Train Acc: 0.9386 Train Prec: 0.9669 Train Rcll: 0.9690 Train F1: 0.9679 Val Loss: 0.5858 Val Acc: 0.7995 Val Prec: 0.8917 Val Rcll: 0.8860 Val F1: 0.884EPOCH: 28/30 Train Loss: 0.1734 Train Acc: 0.7160 Train Prec: 0.8676 Train Rcll: 0.8166 Train F1: 0.8316 Val Loss: 0.4149 Val Acc: 0.3447 Val Prec: 0.5878 Val Rcll: 0.4572 Val F1: 0.4876
+EPOCH: 29/30 Train Loss: 0.2075 Train Acc: 0.7509 Train Prec: 0.9014 Train Rcll: 0.8222 Train F1: 0.8563 Val Loss: 0.3819 Val Acc: 0.3684 Val Prec: 0.6167 Val Rcll: 0.4550 Val F1: 0.5000
+EPOCH: 30/30 Train Loss: 0.1760 Train Acc: 0.7572 Train Prec: 0.9171 Train Rcll: 0.8159 Train F1: 0.8598 Val Loss: 0.4270 Val Acc: 0.3475 Val Prec: 0.6267 Val Rcll: 0.4364 Val F1: 0.4832
+VALIDATION RESULTS: 
+Avg. Accuracy: 0.3474729336660465
+Avg. Precision: 0.626662813802947
+Avg. Recall: 0.4363854804688906
+Avg. F1: 0.4832255505655001
+VALIDATION RESULTS (PER CLASS): 
+Accuracy: [0.89037907 0.390625   0.51546392 0.44897959 0.67521368 0.31147541
+ 0.47457627 0.29133858 0.16666667 0.02222222 0.09259259 0.2
+ 0.10714286 0.3553719  0.38961039 0.30392157 0.35652174 0.26241135]
+Precision: [0.91097755 0.80645161 0.96153846 0.53658537 0.69911504 0.82608696
+ 0.83168317 0.578125   0.26373626 0.14285714 0.29411765 0.5
+ 0.6        0.44329897 0.65217391 0.91176471 0.81456954 0.50684932]
+Recall: [0.9752337  0.43103448 0.52631579 0.73333333 0.95180723 0.33333333
+ 0.525      0.37       0.31168831 0.02564103 0.11904762 0.25
+ 0.11538462 0.64179104 0.49180328 0.31313131 0.38801262 0.35238095]
+F1: [0.94201114 0.56179775 0.68027211 0.61971831 0.80612245 0.475
+ 0.64367816 0.45121951 0.28571429 0.04347826 0.16949153 0.33333333
+ 0.19354839 0.52439024 0.56074766 0.46616541 0.52564103 0.41573034]
+GENERALIZATION GAP ANALYSIS: 
+Train-Val-Accuracy Difference: -0.2509609304492817
+Train-Val-Accuracy Difference: 0.4097637424907101
+Train-Val-Precision Difference: 0.2904561604234319
+Train-Val-Recall Difference: 0.3795155263946871
+Train-Val-F1 Difference: 0.3765727394038989
+
+Final time elapsed: 00:16:01.29
+
