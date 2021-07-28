@@ -39,7 +39,7 @@ def load_dataset(dataset, cutoff_sequence_train, cutoff_sequence_test, pred_type
         if pred_type == 'gestures':
             class_names = ['open_door_1', 'open_door_2', 'close_door_1', 'close_door_2', 'open_fridge',
                            'close_fridge', 'open_dishwasher', 'close_dishwasher', 'open_drawer_1', 'close_drawer_1',
-                           'open_drawer_2', 'close_drawer_2', 'open_drawer_3', 'open_drawer_3', 'clean_table',
+                           'open_drawer_2', 'close_drawer_2', 'open_drawer_3', 'close_drawer_3', 'clean_table',
                            'drink_from_cup', 'toggle_switch']
         elif pred_type == 'locomotion':
             class_names = ['stand', 'walk', 'sit', 'lie']
