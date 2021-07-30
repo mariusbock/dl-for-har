@@ -74,9 +74,7 @@ Note that within the log files accuracy, precision, recall and F1-score inbetwee
 
 ## Results file
 
-The results excel sheet (results.xlsx) contains all results mentioned within the paper as well as aggregated information about the standard deviation across runs, per-class results and standard deviation across subjects.
-
-Tables and figures coming soon!
+The results excel sheet (results.xlsx) contains all results mentioned within the paper and GitHub as well as aggregated information about the standard deviation across runs, per-class results and standard deviation across subjects.
 
 ## Installing PyAV
 - For Linux: 
