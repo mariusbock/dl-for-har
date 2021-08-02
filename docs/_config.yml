@@ -21,9 +21,7 @@
 title: Tutorial on Deep Learning for HAR
 email: marius.bock@uni-siegen.de
 description: >- # this means to ignore newlines until "baseurl:"
-  Write an awesome description for your new site here. You can edit this
-  line in _config.yml. It will appear in your document head meta (for
-  Google search results) and in your feed.xml site description.
+  Welcome to the official GitHub page of the Tutorial Deep Learning for Human Activity Recognition held at the International Symposium on Wearable Computers 2021 (ISWC 21')
 baseurl: "/dl-for-har" # the subpath of your site, e.g. /blog
 domain: mariusbock.github.io
 url: "https://mariusbock.github.io"

@@ -20,6 +20,7 @@ group :jekyll_plugins do
   gem "jekyll-sass-converter", "~> 1.5.2"
   gem "mercenary", "~> 0.3"
   gem "i18n", "~> 0.7"
+  gem "just-the-docs"
 
 end
 
