@@ -1,6 +1,6 @@
 # Improving Deep Learning for HAR with shallow LSTMs (ISWC 21' Note paper)
 
-This is the official GitHub page of the note paper publication "Improving Deep Learning for HAR with shallow LSTMs" presented at the International Symposium on Wearable Computers 21' (ISWC 21').
+This is the official GitHub page of the note paper publication "Improving Deep Learning for HAR with shallow LSTMs" presented at the International Symposium on Wearable Computers 21' (ISWC 21'). [[cite our work]](#cite)
 
 ## Abstract
 Recent studies in Human Activity Recognition (HAR) have shown that Deep Learning methods are able to outperform classical Machine Learning algorithms. One popular Deep Learning architecture in HAR is the DeepConvLSTM. In this paper we propose to alter the DeepConvLSTM architecture to employ a 1-layered instead of a 2-layered LSTM. We validate our architecture change on 5 publicly available HAR datasets by comparing the predictive performance with and without the change employing varying hidden units within the LSTM layer(s). Results show that across all datasets, our architecture consistently improves on the original one: Recognition performance increases up to 11.7% for the F1-score,and our architecture significantly decreases the amount of learnable parameters. This improvement over DeepConvLSTM decreases training time by as much as 48%. Our results stand in contrast to the belief that one needs at least a 2-layered LSTM when dealing with sequential data. Based on our results we argue that said claim might not be applicable to sensor-based HAR.
@@ -89,6 +89,7 @@ cd PyAV
 make
 ```
 ## Citation
+<a id="cite">Cite this work as: </a><br/> 
 Marius Bock, Alexander Hölzemann, Michael Moeller, and Kristof Van Laerhoven. 2021. Improving Deep Learning for HAR with shallow LSTMs. In 2021 International Symposium on Wearable Computers (ISWC ’21), September 21–26, 2021, Virtual, USA. ACM, New York, NY, USA, 6 pages. https://doi.org/10.1145/3460421.3480419
 
 ## Dataset References
