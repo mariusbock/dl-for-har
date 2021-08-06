@@ -17,6 +17,11 @@ Results were obtained on the Wetlab [[4]](#4), RWHAR [[6]](#6), SBHAR [[2]](#2) 
   <img width="" height="" src="images/results.png">
 </p>
 
+### Standard deviation across runs
+<p align="center">
+  <img width="" height="" src="images/average_stdev_runs.png">
+</p>
+
 ### Per-class results
 
 <p align="center">
@@ -37,11 +42,6 @@ Results were obtained on the Wetlab [[4]](#4), RWHAR [[6]](#6), SBHAR [[2]](#2) 
 
 <p align="center">
   <img width="" height="" src="images/per_class_opportunity.png">
-</p>
-
-### Standard deviation across runs
-<p align="center">
-  <img width="" height="" src="images/average_stdev_runs.png">
 </p>
 
 ## Repo Structure
