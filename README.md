@@ -89,8 +89,7 @@ cd PyAV
 make
 ```
 ## Citation
-
-Coming soon
+Marius Bock, Alexander Hölzemann, Michael Moeller, and Kristof Van Laerhoven. 2021. Improving Deep Learning for HAR with shallow LSTMs. In 2021 International Symposium on Wearable Computers (ISWC ’21), September 21–26, 2021, Virtual, USA. ACM, New York, NY, USA, 6 pages. https://doi.org/10.1145/3460421.3480419
 
 ## References
 <a id="1">[1]</a> 
