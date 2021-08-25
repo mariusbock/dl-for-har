@@ -24,7 +24,7 @@ def load_dataset(dataset, cutoff_sequence_train, cutoff_sequence_test, pred_type
         class_names = ['walking', 'walking_upstairs', 'walking_downstairs', 'sitting', 'standing', 'laying',
                        'stand_to_sit', 'sit_to_stand', 'sit_to_lie', 'lie_to_sit', 'stand_to_lie', 'lie_to_stand']
         sampling_rate = 50
-        has_null = False
+        has_null = True
     elif dataset == 'rwhar':
         class_names = ['climbingdown', 'climbingup', 'jumping', 'lying', 'running', 'sitting', 'standing', 'walking']
         sampling_rate = 50
@@ -66,7 +66,7 @@ def load_dataset(dataset, cutoff_sequence_train, cutoff_sequence_test, pred_type
 
     if has_null and include_null:
         class_names = ['null'] + class_names
-    return X_train, y_train, X_val, y_val, X_test, y_test, len(class_names), class_names, sampling_rate
+    return X_train, y_train, X_val, y_val, X_test, y_test, len(class_names), class_names, sampling_rate, has_null
 
 
 def preprocess_data(data, dataset, cutoff_sequence_train, cutoff_sequence_test, pred_type='actions', has_null=False, include_null=True):

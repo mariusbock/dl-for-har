@@ -498,8 +498,7 @@ def create_opportunity_dataset(folder, output_folder, pred_type):
 if __name__ == '__main__':
     # opportunity
     create_opportunity_dataset('../data/raw/opportunity', '../data/opp_data_gestures.data', 'gestures')
-    create_opportunity_dataset('../data/raw/opportunity', '../data/opp_data_locomotion.data', 'locomotion')
-    """# wetlab
+    # wetlab
     feat = lambda streams: [s for s in streams if s.type == "audio"]
     label = lambda streams: [s for s in streams if s.type == "subtitle"]
     create_wetlab_data_from_mkvs(feat, label, '../data/raw/wetlab', 50).to_csv(
@@ -512,4 +511,4 @@ if __name__ == '__main__':
         '../data/hhar_data.csv', index=False, header=False)
     # rwhar
     create_rwhar_dataset('../data/raw/rwhar/').to_csv(
-        '../data/rwhar_data.csv', index=False, header=False)"""
+        '../data/rwhar_data.csv', index=False, header=False)
