@@ -171,7 +171,7 @@ def adjust_lr(opt, lr_pt_counter, es_pt_counter, best_loss, curr_loss, args):
         return best_loss, lr_pt_counter, es_pt_counter, True, False
 
 
-def train(train_features, train_labels, val_features, val_labels, network, config, cw=None):
+def train(train_features, train_labels, val_features, val_labels, test_features, test_labels, network, config):
     """
     Method to train a PyTorch network.
 
@@ -201,14 +201,9 @@ def train(train_features, train_labels, val_features, val_labels, network, confi
     network.to(config['gpu'])
     network.train()
     if config['use_weights']:
-        if cw is None:
-            class_weights = class_weight.compute_class_weight('balanced', classes=np.unique(train_labels + 1), y=train_labels + 1)
-            print('Applied weighted class weights: ')
-            print(class_weights)
-        else:
-            class_weights = cw
-            print('Applied weighted class weights: ')
-            print(class_weights)
+        class_weights = class_weight.compute_class_weight('balanced', classes=np.unique(train_labels + 1), y=train_labels + 1)
+        print('Applied weighted class weights: ')
+        print(class_weights)
     else:
         class_weights = class_weight.compute_class_weight(None, classes=np.unique(train_labels + 1), y=train_labels + 1)
 
@@ -294,6 +289,7 @@ def train(train_features, train_labels, val_features, val_labels, network, confi
                 y_true = targets.cpu().numpy().flatten()
                 train_preds = np.concatenate((np.array(train_preds, int), np.array(y_preds, int)))
                 train_gt = np.concatenate((np.array(train_gt, int), np.array(y_true, int)))
+
             print("EPOCH: {}/{}".format(e + 1, config['epochs']),
                   "Train Loss: {:.4f}".format(np.mean(train_losses)),
                   "Train Acc: {:.4f}".format(jaccard_score(train_gt, train_preds, average='macro')),
@@ -325,8 +321,33 @@ def train(train_features, train_labels, val_features, val_labels, network, confi
                 best_preds = val_preds
             if stop:
                 return best_train_losses, best_val_losses, np.vstack((best_preds, val_gt)).T
+
+    if test_features.size != 0 and config['valid_type'] == 'normal':
+        test_preds = []
+        test_gt = []
+
+        dataset = torch.utils.data.TensorDataset(torch.from_numpy(test_features).float(),
+                                                 torch.from_numpy(test_labels))
+        testloader = DataLoader(dataset,
+                                batch_size=config['batch_size'],
+                                num_workers=2,
+                                shuffle=False,
+                                )
+        with torch.no_grad():
+            for i, (x, y) in enumerate(testloader):
+                inputs, targets = x.to(config['gpu']), y.to(config['gpu'])
+                test_output = network(inputs)
+                test_output = torch.nn.functional.softmax(test_output, dim=1)
+                y_preds = np.argmax(test_output.cpu().numpy(), axis=-1)
+                y_true = targets.cpu().numpy().flatten()
+                test_preds = np.concatenate((np.array(test_preds, int), np.array(y_preds, int)))
+                test_gt = np.concatenate((np.array(test_gt, int), np.array(y_true, int)))
+            test_output = np.vstack((test_preds, test_gt)).T
+    else:
+        test_output = None
+
     # if plot_gradient gradient plot is shown at end of training
     if config['plot_gradient']:
         plt.show()
 
-    return train_losses, val_losses, np.vstack((val_preds, val_gt)).T
+    return np.vstack((val_preds, val_gt)).T, np.vstack((train_preds, train_gt)).T, test_output

@@ -16,24 +16,34 @@ from misc.logging import Logger
 from misc.torchutils import seed_torch
 
 # data
-DATASET = 'hhar'
+"""
+DATA CHOICES: 
+    - wetlab: 'actions' or 'tasks'
+    - opportunity: 'gestures' or 'locomotion'
+    - opportunity_ordonez: 'gestures' or 'locomotion'
+    - rwhar
+    - sbhar
+    - hhar
+"""
+DATASET = 'opportunity_ordonez'
 PRED_TYPE = 'gestures'
+
 CUTOFF_TRAIN = 4
-CUTOFF_TEST = 30
-SW_LENGTH = 24
+CUTOFF_TEST = 6
+SW_LENGTH = 50
 SW_UNIT = 'units'
-SW_OVERLAP = 50
+SW_OVERLAP = 60
 MEANS_AND_STDS = False
 INCLUDE_NULL = True
 
 # network
 NETWORK = 'deepconvlstm'
-NB_UNITS_LSTM = 64
+NB_UNITS_LSTM = 128
 NB_LAYERS_LSTM = 1
 CONV_BLOCK_TYPE = 'normal'
-NB_CONV_BLOCKS = 1
+NB_CONV_BLOCKS = 2
 NB_FILTERS = 64
-FILTER_WIDTH = 5
+FILTER_WIDTH = 11
 DILATION = 1
 DROP_PROB = 0.5
 POOLING = False
@@ -46,20 +56,20 @@ REDUCE_LAYER_OUTPUT = 8
 # training
 VALID_TYPE = 'cross-participant'
 BATCH_SIZE = 100
-EPOCHS = 30
+EPOCHS = 5
 OPTIMIZER = 'adam'
 LR = 1e-4
 WEIGHT_DECAY = 1e-6
 WEIGHTS_INIT = 'None'
 LOSS = 'cross-entropy'
-USE_WEIGHTS = False
+USE_WEIGHTS = True
 ADJ_LR = False
 EARLY_STOPPING = False
 ADJ_LR_PATIENCE = 2
 ES_PATIENCE = 5
 
 # print settings
-LOGGING = True
+LOGGING = False
 PRINT_COUNTS = False
 PLOT_GRADIENT = False
 VERBOSE = False
@@ -67,7 +77,7 @@ SAVE_PREDICTIONS = False
 
 # misc
 GPU = 'cuda:0'
-SPLITS_SSS = 10
+SPLITS_SSS = 2
 SIZE_SSS = 0.6
 SEED = 1
 PRINT_FREQ = 100
@@ -86,7 +96,7 @@ def main(args):
     print('Applied settings: ')
     print(args)
 
-    ################################################## DATA LOADING ########################################################
+    ################################################## DATA LOADING ####################################################
 
     print('Loading data...')
     X_train, y_train, X_val, y_val, X_test, y_test, nb_classes, class_names, sampling_rate, has_null = \
@@ -100,12 +110,15 @@ def main(args):
     args.nb_classes = nb_classes
     args.class_names = class_names
     args.has_null = has_null
+    if args.dataset == 'opportunity_ordonez':
+        args.valid_type = 'normal'
+
     if args.means_and_stds:
         X_train = np.concatenate((X_train, compute_mean_and_std(X_train[:, 1:])), axis=1)
         X_val = np.concatenate((X_val, compute_mean_and_std(X_val[:, 1:])), axis=1)
         X_test = np.concatenate((X_test, compute_mean_and_std(X_test[:, 1:])), axis=1)
 
-    ############################################### TRAINING ###############################################################
+    ############################################# TRAINING #############################################################
 
     if args.network == 'deepconvlstm':
         from model.train import train
@@ -118,7 +131,7 @@ def main(args):
             y = np.concatenate((y_train, y_val), axis=0)
             data = np.concatenate((X, (np.array(y)[:, None])), axis=1)
             cp_scores = np.zeros((4, args.nb_classes, int(np.max(data[:, 0]) + 1)))
-            train_val_gap = np.zeros((5, int(np.max(data[:, 0]) + 1)))
+            train_val_gap = np.zeros((4, int(np.max(data[:, 0]) + 1)))
             all_eval_output = None
             for i, sbj in enumerate(np.unique(data[:, 0])):
                 # for i, sbj in enumerate([0, 1]):
@@ -145,8 +158,8 @@ def main(args):
 
                 net = DeepConvLSTM(config=vars(args))
 
-                train_losses, val_losses, val_output, train_output = train(X_train, y_train, X_val, y_val, network=net,
-                                                                           config=vars(args))
+                val_output, train_output, _ = train(X_train, y_train, X_val, y_val, X_test, y_test,
+                                                              network=net, config=vars(args))
 
                 if all_eval_output is None:
                     all_eval_output = val_output
@@ -163,14 +176,13 @@ def main(args):
                 cp_scores[3, :, int(sbj)] = f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)
 
                 # fill values for train val gap evaluation
-                train_val_gap[0, int(sbj)] = np.mean(train_losses) - np.mean(val_losses)
-                train_val_gap[1, int(sbj)] = jaccard_score(train_output[:, 1], train_output[:, 0], average='macro') - \
+                train_val_gap[0, int(sbj)] = jaccard_score(train_output[:, 1], train_output[:, 0], average='macro') - \
                                              jaccard_score(val_output[:, 1], val_output[:, 0], average='macro')
-                train_val_gap[2, int(sbj)] = precision_score(train_output[:, 1], train_output[:, 0], average='macro') - \
+                train_val_gap[1, int(sbj)] = precision_score(train_output[:, 1], train_output[:, 0], average='macro') - \
                                              precision_score(val_output[:, 1], val_output[:, 0], average='macro')
-                train_val_gap[3, int(sbj)] = recall_score(train_output[:, 1], train_output[:, 0], average='macro') - \
+                train_val_gap[2, int(sbj)] = recall_score(train_output[:, 1], train_output[:, 0], average='macro') - \
                                              recall_score(val_output[:, 1], val_output[:, 0], average='macro')
-                train_val_gap[4, int(sbj)] = f1_score(train_output[:, 1], train_output[:, 0], average='macro') - \
+                train_val_gap[3, int(sbj)] = f1_score(train_output[:, 1], train_output[:, 0], average='macro') - \
                                              f1_score(val_output[:, 1], val_output[:, 0], average='macro')
 
                 print("SUBJECT {0} VALIDATION RESULTS: ".format(int(sbj) + 1))
@@ -183,7 +195,7 @@ def main(args):
                 print("F1: {0}".format(f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
 
             evaluate_participant_scores(participant_scores=cp_scores,
-                                        train_val_gap=train_val_gap,
+                                        gen_gap_scores=train_val_gap,
                                         input_cm=all_eval_output,
                                         class_names=args.class_names,
                                         nb_subjects=int(np.max(data[:, 0]) + 1),
@@ -200,6 +212,8 @@ def main(args):
             data = np.concatenate((X, (np.array(y)[:, None])), axis=1)
             pp_scores = np.zeros((4, args.nb_classes, int(np.max(data[:, 0]) + 1)))
             all_eval_output = None
+            train_val_gap = np.zeros((4, int(np.max(data[:, 0]) + 1)))
+
             for i, sbj in enumerate(np.unique(data[:, 0])):
                 print('\n VALIDATING FOR SUBJECT {0} OF {1}'.format(int(sbj) + 1, int(np.max(data[:, 0])) + 1))
 
@@ -208,22 +222,18 @@ def main(args):
                                              random_state=args.seed)
 
                 subject_data = data[data[:, 0] == sbj]
-                non_subject_data = data[data[:, 0] != sbj]
                 X, y = subject_data[:, :-1], subject_data[:, -1]
-
-                if args.use_weights:
-                    class_weights = cw.compute_class_weight('balanced',
-                                                            classes=np.unique(non_subject_data[:, -1] + 1),
-                                                            y=non_subject_data[:, -1] + 1
-                                                            )
-                else:
-                    class_weights = None
 
                 classes = np.array(range(args.nb_classes))
                 subject_accuracy = np.zeros(args.nb_classes)
                 subject_precision = np.zeros(args.nb_classes)
                 subject_recall = np.zeros(args.nb_classes)
                 subject_f1 = np.zeros(args.nb_classes)
+
+                subject_accuracy_gap = 0
+                subject_precision_gap = 0
+                subject_recall_gap = 0
+                subject_f1_gap = 0
                 for j, (train_index, test_index) in enumerate(sss.split(X, y)):
                     print('SPLIT {0}/{1}'.format(j + 1, args.splits_sss))
 
@@ -251,8 +261,8 @@ def main(args):
 
                     net = DeepConvLSTM(config=vars(args))
 
-                    train_losses, val_losses, val_output, train_output = train(X_train, y_train, X_val, y_val,
-                                                                               network=net, config=vars(args), cw=class_weights)
+                    val_output, train_output, _ = train(X_train, y_train, X_val, y_val, X_test, y_test,
+                                                        network=net, config=vars(args))
 
                     if all_eval_output is None:
                         all_eval_output = val_output
@@ -266,10 +276,25 @@ def main(args):
                     subject_recall += recall_score(val_output[:, 1], val_output[:, 0], average=None, labels=classes)
                     subject_f1 += f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=classes)
 
+                    # add up train val gap evaluation
+                    subject_accuracy_gap = jaccard_score(train_output[:, 1], train_output[:, 0], average='macro') - \
+                                                 jaccard_score(val_output[:, 1], val_output[:, 0], average='macro')
+                    subject_precision_gap = precision_score(train_output[:, 1], train_output[:, 0], average='macro') - \
+                                                 precision_score(val_output[:, 1], val_output[:, 0], average='macro')
+                    subject_recall_gap = recall_score(train_output[:, 1], train_output[:, 0], average='macro') - \
+                                                 recall_score(val_output[:, 1], val_output[:, 0], average='macro')
+                    subject_f1_gap = f1_score(train_output[:, 1], train_output[:, 0], average='macro') - \
+                                                 f1_score(val_output[:, 1], val_output[:, 0], average='macro')
+
                 pp_scores[0, :, int(sbj)] = subject_accuracy / args.splits_sss
                 pp_scores[1, :, int(sbj)] = subject_precision / args.splits_sss
                 pp_scores[2, :, int(sbj)] = subject_recall / args.splits_sss
                 pp_scores[3, :, int(sbj)] = subject_f1 / args.splits_sss
+
+                train_val_gap[0, int(sbj)] = subject_accuracy_gap / args.splits_sss
+                train_val_gap[1, int(sbj)] = subject_precision_gap / args.splits_sss
+                train_val_gap[2, int(sbj)] = subject_recall_gap / args.splits_sss
+                train_val_gap[3, int(sbj)] = subject_f1_gap / args.splits_sss
 
                 print("SUBJECT {0} VALIDATION RESULTS: ".format(int(sbj)))
                 print("Accuracy: {0}".format(pp_scores[0, :, int(sbj)]))
@@ -281,12 +306,15 @@ def main(args):
                 np.save('predictions/' + args.pred_type + '.npy', val_output)
 
             evaluate_participant_scores(participant_scores=pp_scores,
+                                        gen_gap_scores=train_val_gap,
                                         input_cm=all_eval_output,
                                         class_names=args.class_names,
                                         nb_subjects=int(np.max(data[:, 0]) + 1),
                                         filepath=os.path.join('logs', log_date, log_timestamp),
-                                        filename='per-participant'
+                                        filename='per-participant',
+                                        args=args
                                         )
+
         elif args.valid_type == 'normal':
             # Sensor data is segmented using a sliding window mechanism
             X_train, y_train = apply_sliding_window(args.dataset, X_train, y_train,
@@ -305,12 +333,23 @@ def main(args):
 
             args.window_size = X_train.shape[1]
             args.nb_channels = X_train.shape[2]
-            print(X_train.shape)
 
             net = DeepConvLSTM(config=vars(args))
 
-            train_losses, val_losses, val_output, train_output = train(X_train, y_train, X_val, y_val, network=net,
-                                                                       config=vars(args))
+            if X_test.size == 0:
+                val_output, train_output, _ = train(X_train, y_train, X_val, y_val, X_test, y_test,
+                                                    network=net, config=vars(args))
+            else:
+                X_test, y_test = apply_sliding_window(args.dataset, X_test, y_test,
+                                                      sliding_window_size=args.sw_length,
+                                                      unit=args.sw_unit,
+                                                      sampling_rate=args.sampling_rate,
+                                                      sliding_window_overlap=args.sw_overlap,
+                                                      )
+
+                val_output, train_output, test_output = train(X_train, y_train, X_val, y_val, X_test, y_test,
+                                                              network=net, config=vars(args))
+
             cls = np.array(range(args.nb_classes))
             print('VALIDATION RESULTS: ')
             print("Avg. Accuracy: {0}".format(jaccard_score(val_output[:, 1], val_output[:, 0], average='macro')))
@@ -324,10 +363,20 @@ def main(args):
             print("Recall: {0}".format(recall_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
             print("F1: {0}".format(f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
 
+            if X_test.size != 0:
+                print('TEST RESULTS: ')
+                print("Avg. Accuracy: {0}".format(jaccard_score(test_output[:, 1], test_output[:, 0], average='macro')))
+                print("Avg. Precision: {0}".format(precision_score(test_output[:, 1], test_output[:, 0], average='macro')))
+                print("Avg. Recall: {0}".format(recall_score(test_output[:, 1], test_output[:, 0], average='macro')))
+                print("Avg. F1: {0}".format(f1_score(test_output[:, 1], test_output[:, 0], average='macro')))
+
+                print("TEST RESULTS (PER CLASS): ")
+                print("Accuracy: {0}".format(jaccard_score(test_output[:, 1], test_output[:, 0], average=None, labels=cls)))
+                print("Precision: {0}".format(precision_score(test_output[:, 1], test_output[:, 0], average=None, labels=cls)))
+                print("Recall: {0}".format(recall_score(test_output[:, 1], test_output[:, 0], average=None, labels=cls)))
+                print("F1: {0}".format(f1_score(test_output[:, 1], test_output[:, 0], average=None, labels=cls)))
+
             print("GENERALIZATION GAP ANALYSIS: ")
-            print("Train-Val-Accuracy Difference: {0}".format(
-                np.mean(train_losses) -
-                np.mean(val_losses)))
             print("Train-Val-Accuracy Difference: {0}".format(
                 jaccard_score(train_output[:, 1], train_output[:, 0], average='macro') -
                 jaccard_score(val_output[:, 1], val_output[:, 0], average='macro')))
@@ -341,7 +390,6 @@ def main(args):
                 f1_score(train_output[:, 1], train_output[:, 0], average='macro') -
                 f1_score(val_output[:, 1], val_output[:, 0], average='macro')))
 
-            # TODO: include test predictions
             # TODO: implement k-fold
     else:
         print('Error: Did not provide a valid network name!')

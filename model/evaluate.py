@@ -79,7 +79,9 @@ def plot_confusion_matrix(input, target_names, title='Confusion matrix', cmap=No
         plt.savefig(output_path)
 
 
-def evaluate_participant_scores(participant_scores, input_cm, class_names, nb_subjects, filepath, filename):
+def evaluate_participant_scores(participant_scores, gen_gap_scores, input_cm, class_names, nb_subjects, filepath, filename, args):
+    print('\nPREDICTION RESULTS')
+    print('-------------------')
     print('Average results')
     avg_acc = np.mean(participant_scores[0, :, :])
     std_acc = np.std(participant_scores[0, :, :])
@@ -93,19 +95,20 @@ def evaluate_participant_scores(participant_scores, input_cm, class_names, nb_su
           'Avg. Precision {:.4f} (±{:.4f}), '.format(avg_prc, std_prc),
           'Avg. Recall {:.4f} (±{:.4f}), '.format(avg_rcll, std_rcll),
           'Avg. F1-Score {:.4f} (±{:.4f})'.format(avg_f1, std_f1))
-    print('Average results (no null)')
-    avg_acc = np.mean(participant_scores[0, 1:, :])
-    std_acc = np.std(participant_scores[0, 1:, :])
-    avg_prc = np.mean(participant_scores[1, 1:, :])
-    std_prc = np.std(participant_scores[1, 1:, :])
-    avg_rcll = np.mean(participant_scores[2, 1:, :])
-    std_rcll = np.std(participant_scores[2, 1:, :])
-    avg_f1 = np.mean(participant_scores[3, 1:, :])
-    std_f1 = np.std(participant_scores[3, 1:, :])
-    print('Avg. Accuracy {:.4f} (±{:.4f}), '.format(avg_acc, std_acc),
-          'Avg. Precision {:.4f} (±{:.4f}), '.format(avg_prc, std_prc),
-          'Avg. Recall {:.4f} (±{:.4f}), '.format(avg_rcll, std_rcll),
-          'Avg. F1-Score {:.4f} (±{:.4f})'.format(avg_f1, std_f1))
+    if args.include_null:
+        print('Average results (no null)')
+        avg_acc = np.mean(participant_scores[0, 1:, :])
+        std_acc = np.std(participant_scores[0, 1:, :])
+        avg_prc = np.mean(participant_scores[1, 1:, :])
+        std_prc = np.std(participant_scores[1, 1:, :])
+        avg_rcll = np.mean(participant_scores[2, 1:, :])
+        std_rcll = np.std(participant_scores[2, 1:, :])
+        avg_f1 = np.mean(participant_scores[3, 1:, :])
+        std_f1 = np.std(participant_scores[3, 1:, :])
+        print('Avg. Accuracy {:.4f} (±{:.4f}), '.format(avg_acc, std_acc),
+              'Avg. Precision {:.4f} (±{:.4f}), '.format(avg_prc, std_prc),
+              'Avg. Recall {:.4f} (±{:.4f}), '.format(avg_rcll, std_rcll),
+              'Avg. F1-Score {:.4f} (±{:.4f})'.format(avg_f1, std_f1))
     print('Average class results')
     for i, class_name in enumerate(class_names):
         avg_acc = np.mean(participant_scores[0, i, :])
@@ -132,6 +135,33 @@ def evaluate_participant_scores(participant_scores, input_cm, class_names, nb_su
                   'Precision {:.4f}, '.format(prc),
                   'Recall {:.4f}, '.format(rcll),
                   'F1-Score {:.4f}'.format(f1))
+
+    print('\nGENERALIZATION GAP ANALYSIS')
+    print('-------------------')
+    print('Average results')
+    avg_acc = np.mean(gen_gap_scores[0, :])
+    std_acc = np.std(gen_gap_scores[0, :])
+    avg_prc = np.mean(gen_gap_scores[1, :])
+    std_prc = np.std(gen_gap_scores[1, :])
+    avg_rcll = np.mean(gen_gap_scores[2, :])
+    std_rcll = np.std(gen_gap_scores[2, :])
+    avg_f1 = np.mean(gen_gap_scores[3, :])
+    std_f1 = np.std(gen_gap_scores[3, :])
+    print('Avg. Accuracy {:.4f} (±{:.4f}), '.format(avg_acc, std_acc),
+          'Avg. Precision {:.4f} (±{:.4f}), '.format(avg_prc, std_prc),
+          'Avg. Recall {:.4f} (±{:.4f}), '.format(avg_rcll, std_rcll),
+          'Avg. F1-Score {:.4f} (±{:.4f})'.format(avg_f1, std_f1))
+    print('Subject-wise results')
+    for subject in range(nb_subjects):
+        print('Subject ', subject + 1, ' results: ')
+        acc = gen_gap_scores[0, subject]
+        prc = gen_gap_scores[1, subject]
+        rcll = gen_gap_scores[2, subject]
+        f1 = gen_gap_scores[3, subject]
+        print('Accuracy {:.4f}, '.format(acc),
+              'Precision {:.4f}, '.format(prc),
+              'Recall {:.4f}, '.format(rcll),
+              'F1-Score {:.4f}'.format(f1))
 
     # create boxplots
     fig, axs = plt.subplots(2, 2, figsize=(8, 8))

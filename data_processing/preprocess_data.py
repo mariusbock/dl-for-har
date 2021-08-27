@@ -33,7 +33,7 @@ def load_dataset(dataset, cutoff_sequence_train, cutoff_sequence_test, pred_type
         class_names = ['biking', 'sitting', 'standing', 'walking', 'stair up', 'stair down']
         sampling_rate = 100
         has_null = True
-    elif dataset == 'opportunity':
+    elif dataset == 'opportunity' or dataset == 'opportunity_ordonez':
         sampling_rate = 30
         has_null = True
         if pred_type == 'gestures':
@@ -43,14 +43,8 @@ def load_dataset(dataset, cutoff_sequence_train, cutoff_sequence_test, pred_type
                            'drink_from_cup', 'toggle_switch']
         elif pred_type == 'locomotion':
             class_names = ['stand', 'walk', 'sit', 'lie']
-    if dataset == 'opportunity' and pred_type == 'gestures':
-        with open(os.path.join('data/', 'opp_data_gestures.data'), 'rb') as f:
-            data = cp.load(f)
-    elif dataset == 'opportunity' and pred_type == 'locomotion':
-        with open(os.path.join('data/', 'opp_data_locomotion.data'), 'rb') as f:
-            data = cp.load(f)
-    else:
-        data = pd.read_csv(os.path.join('data/', dataset + '_data.csv'), sep=',', header=None, index_col=None)
+
+    data = pd.read_csv(os.path.join('data/', dataset + '_data.csv'), sep=',', header=None, index_col=None)
     X_train, y_train, X_val, y_val, X_test, y_test = \
         preprocess_data(data, dataset, cutoff_sequence_train, cutoff_sequence_test, pred_type, has_null, include_null)
 
@@ -66,6 +60,7 @@ def load_dataset(dataset, cutoff_sequence_train, cutoff_sequence_test, pred_type
 
     if has_null and include_null:
         class_names = ['null'] + class_names
+
     return X_train, y_train, X_val, y_val, X_test, y_test, len(class_names), class_names, sampling_rate, has_null
 
 
@@ -89,17 +84,22 @@ def preprocess_data(data, dataset, cutoff_sequence_train, cutoff_sequence_test, 
         Training and validation datasets that can be used for training
     """
     print('Processing dataset files ...')
-    if has_null:
-        if dataset == 'wetlab' and pred_type == "actions" and not include_null:
+    if dataset == 'opportunity_ordonez':
+        if pred_type == 'locomotion':
+            X_train, y_train = data[:557963, :113], data[:557963, :114]
+            X_val, y_val = data[557963:, :113], data[557963:, :114]
+        elif pred_type == 'gestures':
+            X_train, y_train = data[:557963, :113], data[:557963, :115]
+            X_val, y_val = data[557963:, :113], data[557963:, :115]
+        X_test, y_test = pd.DataFrame(), pd.DataFrame()
+    elif has_null:
+        if (dataset == 'wetlab' and pred_type == "actions" and not include_null) or \
+           (dataset == 'opportunity' and pred_type == "gestures" and not include_null):
             train = data[(data.iloc[:, 0] <= cutoff_sequence_train)
                          & (data.iloc[:, -2] != '0') & (data.iloc[:, -2] != 0)]
             val = data[(data.iloc[:, 0] <= cutoff_sequence_test) & (data.iloc[:, 0] > cutoff_sequence_train)
                        & (data.iloc[:, -2] != '0') & (data.iloc[:, -2] != 0)]
             test = data[(data.iloc[:, 0] > cutoff_sequence_test) & (data.iloc[:, -2] != '0') & (data.iloc[:, -2] != 0)]
-        elif dataset == 'opportunity':
-            X_train, y_train = data[0]
-            X_val, y_val = data[1]
-            X_test, y_test = pd.DataFrame(), pd.DataFrame()
         elif not include_null:
             train = data[(data.iloc[:, 0] <= cutoff_sequence_train)
                          & (data.iloc[:, -1] != '0') & (data.iloc[:, -1] != 0)]
@@ -115,12 +115,12 @@ def preprocess_data(data, dataset, cutoff_sequence_train, cutoff_sequence_test, 
         val = data[(data.iloc[:, 0] <= cutoff_sequence_test) & (data.iloc[:, 0] > cutoff_sequence_train)]
         test = data[(data.iloc[:, 0] > cutoff_sequence_test)]
 
-    if dataset == 'wetlab' and pred_type == 'actions':
+    if (dataset == 'wetlab' and pred_type == 'actions') or (dataset == 'opportunity' and pred_type == "locomotion"):
         X_train, X_val, X_test = train.iloc[:, :-2], val.iloc[:, :-2], test.iloc[:, :-2]
         y_train = adjust_labels(train.iloc[:, -2], dataset, pred_type).astype(int)
         y_val = adjust_labels(val.iloc[:, -2], dataset, pred_type).astype(int)
         y_test = adjust_labels(test.iloc[:, -2], dataset, pred_type).astype(int)
-    elif dataset == 'opportunity':
+    elif dataset == 'oppportunity_ordonez':
         pass
     else:
         X_train, X_val, X_test = train.iloc[:, :-1], val.iloc[:, :-1], test.iloc[:, :-1]
@@ -134,16 +134,14 @@ def preprocess_data(data, dataset, cutoff_sequence_train, cutoff_sequence_test, 
         y_test -= 1
 
     # if no null class in dataset subtract one from all labels
-    if has_null and not include_null:
+    if has_null and not include_null and dataset != 'oppportunity_ordonez':
         y_train -= 1
         y_val -= 1
         y_test -= 1
     print("Final datasets with size: | train {0} | val {1} | test {2} | ".format(X_train.shape, X_val.shape,
                                                                                  X_test.shape))
-    if dataset == 'opportunity':
-        return X_train, y_train, X_val, y_val, X_test.to_numpy(), y_test.to_numpy()
-    else:
-        return X_train.to_numpy(), y_train.to_numpy(), X_val.to_numpy(), y_val.to_numpy(), X_test.to_numpy(), y_test.to_numpy()
+
+    return X_train.to_numpy(), y_train.to_numpy(), X_val.to_numpy(), y_val.to_numpy(), X_test.to_numpy(), y_test.to_numpy()
 
 
 def compute_mean_and_std(data):

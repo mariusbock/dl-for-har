@@ -7,7 +7,6 @@ from glob import glob
 import os
 from io import BytesIO
 import zipfile
-import pickle as cp
 
 
 def milliseconds_to_hertz(start, end, rate):
@@ -221,7 +220,7 @@ def create_rwhar_dataset(folder):
 
             for activity in RWHAR_ACTIVITY_NUM.keys():  # pair the acc and gyr zips of the same activity
                 activity_name = "_" + activity + "_csv.zip"
-                path_acc = filepath + sub + "/acc" + activity_name  # concat the path to acc file for given activity and subject
+                path_acc = filepath + '/' + sub + "/acc" + activity_name  # concat the path to acc file for given activity and subject
                 table = rwhar_load_table_activity(path_acc)
                 table["activity"] = RWHAR_ACTIVITY_NUM[activity]  # add a activity column and fill it with activity num
                 sub_pd = sub_pd.append(table)
@@ -247,29 +246,35 @@ def create_rwhar_dataset(folder):
     return data
 
 
-def create_opportunity_dataset(folder, output_folder, pred_type):
+def create_opportunity_dataset(folder, output_folder):
     # Hardcoded number of sensor channels employed in the OPPORTUNITY challenge
     NB_SENSOR_CHANNELS = 113
 
     # Hardcoded names of the files defining the OPPORTUNITY challenge data. As named in the original data.
-    OPPORTUNITY_DATA_FILES = ['OpportunityUCIDataset/dataset/S1-Drill.dat',
-                              'OpportunityUCIDataset/dataset/S1-ADL1.dat',
-                              'OpportunityUCIDataset/dataset/S1-ADL2.dat',
-                              'OpportunityUCIDataset/dataset/S1-ADL3.dat',
-                              'OpportunityUCIDataset/dataset/S1-ADL4.dat',
-                              'OpportunityUCIDataset/dataset/S1-ADL5.dat',
-                              'OpportunityUCIDataset/dataset/S2-Drill.dat',
-                              'OpportunityUCIDataset/dataset/S2-ADL1.dat',
-                              'OpportunityUCIDataset/dataset/S2-ADL2.dat',
-                              'OpportunityUCIDataset/dataset/S2-ADL3.dat',
-                              'OpportunityUCIDataset/dataset/S3-Drill.dat',
-                              'OpportunityUCIDataset/dataset/S3-ADL1.dat',
-                              'OpportunityUCIDataset/dataset/S3-ADL2.dat',
-                              'OpportunityUCIDataset/dataset/S3-ADL3.dat',
-                              'OpportunityUCIDataset/dataset/S2-ADL4.dat',
-                              'OpportunityUCIDataset/dataset/S2-ADL5.dat',
-                              'OpportunityUCIDataset/dataset/S3-ADL4.dat',
-                              'OpportunityUCIDataset/dataset/S3-ADL5.dat'
+    OPPORTUNITY_DATA_FILES = [(0, 'OpportunityUCIDataset/dataset/S1-Drill.dat'),
+                              (0, 'OpportunityUCIDataset/dataset/S1-ADL1.dat'),
+                              (0, 'OpportunityUCIDataset/dataset/S1-ADL2.dat'),
+                              (0, 'OpportunityUCIDataset/dataset/S1-ADL3.dat'),
+                              (0, 'OpportunityUCIDataset/dataset/S1-ADL4.dat'),
+                              (0, 'OpportunityUCIDataset/dataset/S1-ADL5.dat'),
+                              (1, 'OpportunityUCIDataset/dataset/S2-Drill.dat'),
+                              (1, 'OpportunityUCIDataset/dataset/S2-ADL1.dat'),
+                              (1, 'OpportunityUCIDataset/dataset/S2-ADL2.dat'),
+                              (1, 'OpportunityUCIDataset/dataset/S2-ADL3.dat'),
+                              (2, 'OpportunityUCIDataset/dataset/S3-Drill.dat'),
+                              (2, 'OpportunityUCIDataset/dataset/S3-ADL1.dat'),
+                              (2, 'OpportunityUCIDataset/dataset/S3-ADL2.dat'),
+                              (2, 'OpportunityUCIDataset/dataset/S3-ADL3.dat'),
+                              (1, 'OpportunityUCIDataset/dataset/S2-ADL4.dat'),
+                              (1, 'OpportunityUCIDataset/dataset/S2-ADL5.dat'),
+                              (2, 'OpportunityUCIDataset/dataset/S3-ADL4.dat'),
+                              (2, 'OpportunityUCIDataset/dataset/S3-ADL5.dat'),
+                              (3, 'OpportunityUCIDataset/dataset/S4-ADL1.dat'),
+                              (3, 'OpportunityUCIDataset/dataset/S4-ADL2.dat'),
+                              (3, 'OpportunityUCIDataset/dataset/S4-ADL3.dat'),
+                              (3, 'OpportunityUCIDataset/dataset/S4-ADL4.dat'),
+                              (3, 'OpportunityUCIDataset/dataset/S4-ADL5.dat'),
+                              (3, 'OpportunityUCIDataset/dataset/S4-Drill.dat')
                               ]
 
     # Hardcoded thresholds to define global maximums and minimums for every one of the 113 sensor channels employed in the
@@ -340,15 +345,15 @@ def create_opportunity_dataset(folder, output_folder, pred_type):
         data[data < 0] = 0.00
         return data
 
-    def divide_x_y(data, label):
-        """Segments each sample into features and label
+    """def divide_x_y(data, label):
+        """"""Segments each sample into features and label
         :param data: numpy integer matrix
             Sensor data
         :param label: string, ['gestures' (default), 'locomotion']
             Type of activities to be recognized
         :return: numpy integer matrix, numpy integer array
             Features encapsulated into a matrix and labels as an array
-        """
+        """"""
 
         data_x = data[:, 1:114]
         if label not in ['locomotion', 'gestures']:
@@ -358,7 +363,7 @@ def create_opportunity_dataset(folder, output_folder, pred_type):
         elif label == 'gestures':
             data_y = data[:, 115]  # Gestures label
 
-        return data_x, data_y
+        return data_x, data_y"""
 
     def adjust_idx_labels(data_y, label):
         """Transforms original labels into the range [0, nb_labels-1]
@@ -393,37 +398,7 @@ def create_opportunity_dataset(folder, output_folder, pred_type):
             data_y[data_y == 405506] = 17
         return data_y
 
-    def check_data(data_set):
-        """Try to access to the file and checks if dataset is in the data directory
-           In case the file is not found try to download it from original location
-        :param data_set:
-                Path with original OPPORTUNITY zip file
-        :return:
-        """
-        print('Checking dataset {0}'.format(data_set))
-        data_dir, data_file = os.path.split(data_set)
-        # When a directory is not provided, check if dataset is in the data directory
-        if data_dir == "" and not os.path.isfile(data_set):
-            new_path = os.path.join(os.path.split(__file__)[0], "data", data_set)
-            if os.path.isfile(new_path) or data_file == 'OpportunityUCIDataset.zip':
-                data_set = new_path
-
-        # When dataset not found, try to download it from UCI repository
-        if (not os.path.isfile(data_set)) and data_file == 'OpportunityUCIDataset.zip':
-            print('... dataset path {0} not found'.format(data_set))
-            import urllib
-            origin = (
-                'https://archive.ics.uci.edu/ml/machine-learning-databases/00226/OpportunityUCIDataset.zip'
-            )
-            if not os.path.exists(data_dir):
-                print('... creating directory {0}'.format(data_dir))
-                os.makedirs(data_dir)
-            print('... downloading data from {0}'.format(origin))
-            urllib.urlretrieve(origin, data_set)
-
-        return data_dir
-
-    def process_dataset_file(data, label):
+    def process_dataset_file(data):
         """Function defined as a pipeline to process individual OPPORTUNITY files
         :param data: numpy integer matrix
             Matrix containing data samples (rows) for every sensor channel (column)
@@ -435,24 +410,23 @@ def create_opportunity_dataset(folder, output_folder, pred_type):
 
         # Select correct columns
         data = select_columns_opp(data)
-
-        # Colums are segmentd into features and labels
-        data_x, data_y = divide_x_y(data, label)
-        data_y = adjust_idx_labels(data_y, label)
-        data_y = data_y.astype(int)
+        data = data[:, 1:]
+        # adjust labels to be counting from 1
+        data[:, 113] = adjust_idx_labels(data[:, 113], 'locomotion').astype(int)
+        data[:, 114] = adjust_idx_labels(data[:, 114], 'gestures').astype(int)
 
         # Perform linear interpolation
-        data_x = np.array([pd.Series(i).interpolate() for i in data_x.T]).T
+        data[:, :113] = np.array([pd.Series(i).interpolate() for i in data[:, :113].T]).T
 
         # Remaining missing data are converted to zero
-        data_x[np.isnan(data_x)] = 0
+        data[:, :113][np.isnan(data[:, :113])] = 0
 
         # All sensor channels are normalized
-        data_x = normalize(data_x, NORM_MAX_THRESHOLDS, NORM_MIN_THRESHOLDS)
+        data[:, :113] = normalize(data[:, :113], NORM_MAX_THRESHOLDS, NORM_MIN_THRESHOLDS)
 
-        return data_x, data_y
+        return data
 
-    def generate_data(dataset, target_filename, label):
+    def generate_data(dataset, target_filename):
         """Function to read the OPPORTUNITY challenge raw data and process all sensor channels
         :param dataset: string
             Path with original OPPORTUNITY zip file
@@ -462,53 +436,54 @@ def create_opportunity_dataset(folder, output_folder, pred_type):
             Type of activities to be recognized. The OPPORTUNITY dataset includes several annotations to perform
             recognition modes of locomotion/postures and recognition of sporadic gestures.
         """
-
-        data_dir = check_data(dataset)
-
-        data_x = np.empty((0, NB_SENSOR_CHANNELS))
-        data_y = np.empty((0))
+        full = np.empty((0, NB_SENSOR_CHANNELS+3))
 
         zf = zipfile.ZipFile(dataset)
         print('Processing dataset files ...')
-        for filename in OPPORTUNITY_DATA_FILES:
+        for sbj, filename in OPPORTUNITY_DATA_FILES:
             try:
                 data = np.loadtxt(BytesIO(zf.read(filename)))
                 print('... file {0}'.format(filename))
-                x, y = process_dataset_file(data, label)
-                data_x = np.vstack((data_x, x))
-                data_y = np.concatenate([data_y, y])
+                _out = process_dataset_file(data)
+                _sbj = np.full((len(_out), 1), sbj)
+                _out = np.concatenate((_sbj, _out), axis=1)
+                full = np.vstack((full, _out))
             except KeyError:
                 print('ERROR: Did not find {0} in zip file'.format(filename))
 
         # Dataset is segmented into train and test
-        nb_training_samples = 557963
-        # The first 18 OPPORTUNITY data files define the traning dataset, comprising 557963 samples
-        X_train, y_train = data_x[:nb_training_samples, :], data_y[:nb_training_samples]
-        X_test, y_test = data_x[nb_training_samples:, :], data_y[nb_training_samples:]
+        #nb_training_samples = 557963
+        nb_test_samples = 676713
+        print(full.shape)
+        # The first 18 OPPORTUNITY data files define the training dataset, comprising 557963 samples
+        #train = full[:nb_training_samples, :]
+        #test = full[nb_training_samples:nb_test_samples, :]
 
-        print("Final datasets with size: | train {0} | test {1} | ".format(X_train.shape, X_test.shape))
+        print("Final dataset with size: {0} ".format(full.shape))
+        # write full dataset
+        pd.DataFrame(full, index=None).to_csv(os.path.join(target_filename + '_data.csv'), index=False)
+        # write Ordonez split
+        pd.DataFrame(full[:nb_test_samples, :], index=None).to_csv(target_filename + '_ordonez_data.csv', index=False)
+        #cp.dump([train, test], f, protocol=cp.HIGHEST_PROTOCOL)
+        #f.close()
 
-        obj = [(X_train, y_train), (X_test, y_test)]
-        f = open(os.path.join(target_filename), 'wb')
-        cp.dump(obj, f, protocol=cp.HIGHEST_PROTOCOL)
-        f.close()
-    generate_data(os.path.join(folder, 'OpportunityUCIDataset.zip'), output_folder, pred_type)
+    generate_data(os.path.join(folder, 'OpportunityUCIDataset.zip'), output_folder)
 
 
 if __name__ == '__main__':
     # opportunity
-    create_opportunity_dataset('../data/raw/opportunity', '../data/opp_data_gestures.data', 'gestures')
+    create_opportunity_dataset('../data/raw/opportunity', '../data/opportunity')
     # wetlab
     feat = lambda streams: [s for s in streams if s.type == "audio"]
     label = lambda streams: [s for s in streams if s.type == "subtitle"]
-    create_wetlab_data_from_mkvs(feat, label, '../data/raw/wetlab', 50).to_csv(
-        '../data/wetlab_data.csv', index=False, header=False)
+    #create_wetlab_data_from_mkvs(feat, label, '../data/raw/wetlab', 50).to_csv(
+    #    '../data/wetlab_data.csv', index=False, header=False)
     # sbhar
-    create_sbhar_dataset('../data/raw/sbhar').to_csv(
-        '../data/sbhar_data.csv', index=False, header=False)
+    #create_sbhar_dataset('../data/raw/sbhar').to_csv(
+    #    '../data/sbhar_data.csv', index=False, header=False)
     # hhar
-    create_hhar_dataset('../data/raw/hhar').to_csv(
-        '../data/hhar_data.csv', index=False, header=False)
+    #create_hhar_dataset('../data/raw/hhar').to_csv(
+    #    '../data/hhar_data.csv', index=False, header=False)
     # rwhar
-    create_rwhar_dataset('../data/raw/rwhar/').to_csv(
-        '../data/rwhar_data.csv', index=False, header=False)
+    #create_rwhar_dataset('../data/raw/rwhar').to_csv(
+    #    '../data/rwhar_data.csv', index=False, header=False)
