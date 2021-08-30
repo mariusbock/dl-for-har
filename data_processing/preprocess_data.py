@@ -7,7 +7,7 @@ import pickle as cp
 pd.options.mode.chained_assignment = None
 
 
-def load_dataset(dataset, cutoff_sequence_train, cutoff_sequence_test, pred_type='actions', include_null=False):
+def load_dataset(dataset, cutoff_train, cutoff_valid, pred_type='actions', include_null=False):
     if dataset == 'wetlab':
         if pred_type == 'actions':
             class_names = ['cutting', 'inverting', 'peeling', 'pestling', 'pipetting', 'pouring', 'stirring',
@@ -46,7 +46,7 @@ def load_dataset(dataset, cutoff_sequence_train, cutoff_sequence_test, pred_type
 
     data = pd.read_csv(os.path.join('data/', dataset + '_data.csv'), sep=',', header=None, index_col=None)
     X_train, y_train, X_val, y_val, X_test, y_test = \
-        preprocess_data(data, dataset, cutoff_sequence_train, cutoff_sequence_test, pred_type, has_null, include_null)
+        preprocess_data(data, dataset, cutoff_train, cutoff_valid, pred_type, has_null, include_null)
 
     print(" ..from file {}".format(os.path.join('data/', dataset + '_data.csv')))
     print(" ..reading instances: train {0}, val {1}, test {2}".format(X_train.shape, X_val.shape, X_test.shape))
@@ -64,16 +64,16 @@ def load_dataset(dataset, cutoff_sequence_train, cutoff_sequence_test, pred_type
     return X_train, y_train, X_val, y_val, X_test, y_test, len(class_names), class_names, sampling_rate, has_null
 
 
-def preprocess_data(data, dataset, cutoff_sequence_train, cutoff_sequence_test, pred_type='actions', has_null=False, include_null=True):
+def preprocess_data(data, dataset, cutoff_train, cutoff_valid, pred_type='actions', has_null=False, include_null=True):
     """
     Function to preprocess the wetlab dataset according to settings.
 
     :param dataset: string
         Wetlab data
-    :param cutoff_sequence_train: integer
-        Sequence number up to which to contain in the training dataset
-    :param cutoff_sequence_test: integer
-        Sequence number up to which to contain in the validation dataset. All other sequences will be test.
+    :param cutoff_train: integer
+        Subject number up to which to contain in the training dataset
+    :param cutoff_valid: integer
+        Subject number up to which to contain in the validation dataset. All other sequences will be test.
     :param pred_type: string, ['actions' (default), 'tasks']
         Type of labels that are to be used
     :param has_null: boolean, default: True
@@ -86,41 +86,42 @@ def preprocess_data(data, dataset, cutoff_sequence_train, cutoff_sequence_test, 
     print('Processing dataset files ...')
     if dataset == 'opportunity_ordonez':
         if pred_type == 'locomotion':
-            X_train, y_train = data[:557963, :113], data[:557963, :114]
-            X_val, y_val = data[557963:, :113], data[557963:, :114]
+            X_train, y_train = data.iloc[:497014, 1:114], data.iloc[:497014, -2]
+            X_val, y_val = data.iloc[497014:557963, 1:114], data.iloc[497014:557963:, -2]
+            X_test, y_test = data.iloc[557963:, 1:114], data.iloc[557963:, -2]
         elif pred_type == 'gestures':
-            X_train, y_train = data[:557963, :113], data[:557963, :115]
-            X_val, y_val = data[557963:, :113], data[557963:, :115]
-        X_test, y_test = pd.DataFrame(), pd.DataFrame()
+            X_train, y_train = data.iloc[:497014, 1:114], data.iloc[:497014, -1]
+            X_val, y_val = data.iloc[497014:557963, 1:114], data.iloc[497014:557963:, -1]
+            X_test, y_test = data.iloc[557963:, 1:114], data.iloc[557963:, -1]
     elif has_null:
         if (dataset == 'wetlab' and pred_type == "actions" and not include_null) or \
            (dataset == 'opportunity' and pred_type == "gestures" and not include_null):
-            train = data[(data.iloc[:, 0] <= cutoff_sequence_train)
+            train = data[(data.iloc[:, 0] <= cutoff_train)
                          & (data.iloc[:, -2] != '0') & (data.iloc[:, -2] != 0)]
-            val = data[(data.iloc[:, 0] <= cutoff_sequence_test) & (data.iloc[:, 0] > cutoff_sequence_train)
+            val = data[(data.iloc[:, 0] <= cutoff_valid) & (data.iloc[:, 0] > cutoff_train)
                        & (data.iloc[:, -2] != '0') & (data.iloc[:, -2] != 0)]
-            test = data[(data.iloc[:, 0] > cutoff_sequence_test) & (data.iloc[:, -2] != '0') & (data.iloc[:, -2] != 0)]
+            test = data[(data.iloc[:, 0] > cutoff_valid) & (data.iloc[:, -2] != '0') & (data.iloc[:, -2] != 0)]
         elif not include_null:
-            train = data[(data.iloc[:, 0] <= cutoff_sequence_train)
+            train = data[(data.iloc[:, 0] <= cutoff_train)
                          & (data.iloc[:, -1] != '0') & (data.iloc[:, -1] != 0)]
-            val = data[(data.iloc[:, 0] <= cutoff_sequence_test) & (data.iloc[:, 0] > cutoff_sequence_train)
+            val = data[(data.iloc[:, 0] <= cutoff_valid) & (data.iloc[:, 0] > cutoff_train)
                        & (data.iloc[:, -1] != '0') & (data.iloc[:, -1] != 0)]
-            test = data[(data.iloc[:, 0] > cutoff_sequence_test) & (data.iloc[:, -1] != '0') & (data.iloc[:, -1] != 0)]
+            test = data[(data.iloc[:, 0] > cutoff_valid) & (data.iloc[:, -1] != '0') & (data.iloc[:, -1] != 0)]
         else:
-            train = data[(data.iloc[:, 0] <= cutoff_sequence_train)]
-            val = data[(data.iloc[:, 0] <= cutoff_sequence_test) & (data.iloc[:, 0] > cutoff_sequence_train)]
-            test = data[(data.iloc[:, 0] > cutoff_sequence_test)]
+            train = data[(data.iloc[:, 0] <= cutoff_train)]
+            val = data[(data.iloc[:, 0] <= cutoff_valid) & (data.iloc[:, 0] > cutoff_train)]
+            test = data[(data.iloc[:, 0] > cutoff_valid)]
     else:
-        train = data[(data.iloc[:, 0] <= cutoff_sequence_train)]
-        val = data[(data.iloc[:, 0] <= cutoff_sequence_test) & (data.iloc[:, 0] > cutoff_sequence_train)]
-        test = data[(data.iloc[:, 0] > cutoff_sequence_test)]
+        train = data[(data.iloc[:, 0] <= cutoff_train)]
+        val = data[(data.iloc[:, 0] <= cutoff_valid) & (data.iloc[:, 0] > cutoff_train)]
+        test = data[(data.iloc[:, 0] > cutoff_valid)]
 
     if (dataset == 'wetlab' and pred_type == 'actions') or (dataset == 'opportunity' and pred_type == "locomotion"):
         X_train, X_val, X_test = train.iloc[:, :-2], val.iloc[:, :-2], test.iloc[:, :-2]
         y_train = adjust_labels(train.iloc[:, -2], dataset, pred_type).astype(int)
         y_val = adjust_labels(val.iloc[:, -2], dataset, pred_type).astype(int)
         y_test = adjust_labels(test.iloc[:, -2], dataset, pred_type).astype(int)
-    elif dataset == 'oppportunity_ordonez':
+    elif dataset == 'opportunity_ordonez':
         pass
     else:
         X_train, X_val, X_test = train.iloc[:, :-1], val.iloc[:, :-1], test.iloc[:, :-1]

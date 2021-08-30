@@ -83,19 +83,15 @@ def apply_sliding_window(dataset, data_x, data_y, sliding_window_size, unit, sam
     full_data = np.concatenate((data_x, data_y[:, None]), axis=1)
     output_x = None
     output_y = None
-    if dataset == 'opportunity':
+    if dataset == 'opportunity_ordonez':
         if unit == 'units':
             tmp_x, _ = sliding_window_samples(data_x, sliding_window_size, sliding_window_overlap)
             tmp_y, _ = sliding_window_samples(data_y, sliding_window_size, sliding_window_overlap)
         elif unit == 'seconds':
             tmp_x, _ = sliding_window_seconds(data_x, sliding_window_size, sampling_rate, sliding_window_overlap)
             tmp_y, _ = sliding_window_seconds(data_y, sliding_window_size, sampling_rate, sliding_window_overlap)
-        if output_x is None:
-            output_x = tmp_x
-            output_y = tmp_y
-        else:
-            output_x = np.concatenate((output_x, tmp_x), axis=0)
-            output_y = np.concatenate((output_y, tmp_y), axis=0)
+        output_x = tmp_x
+        output_y = tmp_y
     else:
         for i, subject in enumerate(np.unique(full_data[:, 0])):
             subject_data = full_data[full_data[:, 0] == subject]

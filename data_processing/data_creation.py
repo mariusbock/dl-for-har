@@ -251,7 +251,8 @@ def create_opportunity_dataset(folder, output_folder):
     NB_SENSOR_CHANNELS = 113
 
     # Hardcoded names of the files defining the OPPORTUNITY challenge data. As named in the original data.
-    OPPORTUNITY_DATA_FILES = [(0, 'OpportunityUCIDataset/dataset/S1-Drill.dat'),
+    OPPORTUNITY_DATA_FILES = [# Ordonez training
+                              (0, 'OpportunityUCIDataset/dataset/S1-Drill.dat'),
                               (0, 'OpportunityUCIDataset/dataset/S1-ADL1.dat'),
                               (0, 'OpportunityUCIDataset/dataset/S1-ADL2.dat'),
                               (0, 'OpportunityUCIDataset/dataset/S1-ADL3.dat'),
@@ -260,15 +261,18 @@ def create_opportunity_dataset(folder, output_folder):
                               (1, 'OpportunityUCIDataset/dataset/S2-Drill.dat'),
                               (1, 'OpportunityUCIDataset/dataset/S2-ADL1.dat'),
                               (1, 'OpportunityUCIDataset/dataset/S2-ADL2.dat'),
-                              (1, 'OpportunityUCIDataset/dataset/S2-ADL3.dat'),
                               (2, 'OpportunityUCIDataset/dataset/S3-Drill.dat'),
                               (2, 'OpportunityUCIDataset/dataset/S3-ADL1.dat'),
                               (2, 'OpportunityUCIDataset/dataset/S3-ADL2.dat'),
+                              # Ordonez validation
+                              (1, 'OpportunityUCIDataset/dataset/S2-ADL3.dat'),
                               (2, 'OpportunityUCIDataset/dataset/S3-ADL3.dat'),
+                              # Ordonez testing
                               (1, 'OpportunityUCIDataset/dataset/S2-ADL4.dat'),
                               (1, 'OpportunityUCIDataset/dataset/S2-ADL5.dat'),
                               (2, 'OpportunityUCIDataset/dataset/S3-ADL4.dat'),
                               (2, 'OpportunityUCIDataset/dataset/S3-ADL5.dat'),
+                              # additional data
                               (3, 'OpportunityUCIDataset/dataset/S4-ADL1.dat'),
                               (3, 'OpportunityUCIDataset/dataset/S4-ADL2.dat'),
                               (3, 'OpportunityUCIDataset/dataset/S4-ADL3.dat'),
@@ -345,26 +349,6 @@ def create_opportunity_dataset(folder, output_folder):
         data[data < 0] = 0.00
         return data
 
-    """def divide_x_y(data, label):
-        """"""Segments each sample into features and label
-        :param data: numpy integer matrix
-            Sensor data
-        :param label: string, ['gestures' (default), 'locomotion']
-            Type of activities to be recognized
-        :return: numpy integer matrix, numpy integer array
-            Features encapsulated into a matrix and labels as an array
-        """"""
-
-        data_x = data[:, 1:114]
-        if label not in ['locomotion', 'gestures']:
-            raise RuntimeError("Invalid label: '%s'" % label)
-        if label == 'locomotion':
-            data_y = data[:, 114]  # Locomotion label
-        elif label == 'gestures':
-            data_y = data[:, 115]  # Gestures label
-
-        return data_x, data_y"""
-
     def adjust_idx_labels(data_y, label):
         """Transforms original labels into the range [0, nb_labels-1]
         :param data_y: numpy integer array
@@ -402,8 +386,6 @@ def create_opportunity_dataset(folder, output_folder):
         """Function defined as a pipeline to process individual OPPORTUNITY files
         :param data: numpy integer matrix
             Matrix containing data samples (rows) for every sensor channel (column)
-        :param label: string, ['gestures' (default), 'locomotion']
-            Type of activities to be recognized
         :return: numpy integer matrix, numy integer array
             Processed sensor data, segmented into features (x) and labels (y)
         """
@@ -432,9 +414,6 @@ def create_opportunity_dataset(folder, output_folder):
             Path with original OPPORTUNITY zip file
         :param target_filename: string
             Processed file
-        :param label: string, ['gestures' (default), 'locomotion']
-            Type of activities to be recognized. The OPPORTUNITY dataset includes several annotations to perform
-            recognition modes of locomotion/postures and recognition of sporadic gestures.
         """
         full = np.empty((0, NB_SENSOR_CHANNELS+3))
 
@@ -448,24 +427,18 @@ def create_opportunity_dataset(folder, output_folder):
                 _sbj = np.full((len(_out), 1), sbj)
                 _out = np.concatenate((_sbj, _out), axis=1)
                 full = np.vstack((full, _out))
+                print(filename, full.shape)
             except KeyError:
                 print('ERROR: Did not find {0} in zip file'.format(filename))
 
         # Dataset is segmented into train and test
-        #nb_training_samples = 557963
         nb_test_samples = 676713
-        print(full.shape)
-        # The first 18 OPPORTUNITY data files define the training dataset, comprising 557963 samples
-        #train = full[:nb_training_samples, :]
-        #test = full[nb_training_samples:nb_test_samples, :]
 
         print("Final dataset with size: {0} ".format(full.shape))
         # write full dataset
-        pd.DataFrame(full, index=None).to_csv(os.path.join(target_filename + '_data.csv'), index=False)
+        pd.DataFrame(full, index=None).to_csv(os.path.join(target_filename + '_data.csv'), index=False, header=False)
         # write Ordonez split
-        pd.DataFrame(full[:nb_test_samples, :], index=None).to_csv(target_filename + '_ordonez_data.csv', index=False)
-        #cp.dump([train, test], f, protocol=cp.HIGHEST_PROTOCOL)
-        #f.close()
+        pd.DataFrame(full[:nb_test_samples, :], index=None).to_csv(target_filename + '_ordonez_data.csv', index=False, header=False)
 
     generate_data(os.path.join(folder, 'OpportunityUCIDataset.zip'), output_folder)
 
@@ -476,14 +449,14 @@ if __name__ == '__main__':
     # wetlab
     feat = lambda streams: [s for s in streams if s.type == "audio"]
     label = lambda streams: [s for s in streams if s.type == "subtitle"]
-    #create_wetlab_data_from_mkvs(feat, label, '../data/raw/wetlab', 50).to_csv(
-    #    '../data/wetlab_data.csv', index=False, header=False)
+    create_wetlab_data_from_mkvs(feat, label, '../data/raw/wetlab', 50).to_csv(
+        '../data/wetlab_data.csv', index=False, header=False)
     # sbhar
-    #create_sbhar_dataset('../data/raw/sbhar').to_csv(
-    #    '../data/sbhar_data.csv', index=False, header=False)
+    create_sbhar_dataset('../data/raw/sbhar').to_csv(
+        '../data/sbhar_data.csv', index=False, header=False)
     # hhar
-    #create_hhar_dataset('../data/raw/hhar').to_csv(
-    #    '../data/hhar_data.csv', index=False, header=False)
+    create_hhar_dataset('../data/raw/hhar').to_csv(
+        '../data/hhar_data.csv', index=False, header=False)
     # rwhar
-    #create_rwhar_dataset('../data/raw/rwhar').to_csv(
-    #    '../data/rwhar_data.csv', index=False, header=False)
+    create_rwhar_dataset('../data/raw/rwhar').to_csv(
+        '../data/rwhar_data.csv', index=False, header=False)

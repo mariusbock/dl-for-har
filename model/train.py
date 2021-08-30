@@ -97,7 +97,7 @@ def init_weights(network):
 
 def plot_grad_flow(named_parameters):
     """
-    Funtion which plots the average gradient of a network.
+    Function which plots the average gradient of a network.
 
     :param named_parameters: parameters of the network (used to obtain gradient)
     :return: plot containing the plotted average gradient
