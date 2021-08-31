@@ -16,7 +16,8 @@ def milliseconds_to_hertz(start, end, rate):
     :param start: start time in milliseconds
     :param end: end time in milliseconds
     :param rate: employed sampling rate during recording
-    :return: start and end time in hertz
+
+    :return start and end time in hertz
     """
     adjusted_rate = rate / 1000
     return int(np.floor(float(start) * adjusted_rate)), int(np.floor(float(end) * adjusted_rate))
@@ -24,12 +25,14 @@ def milliseconds_to_hertz(start, end, rate):
 
 def create_wetlab_data_from_mkvs(feature_tracks, label_tracks, directory, sample_rate):
     """
-    Funtion which creates the a csv file using the WetLab mkv dataset files as input.
+    Function which creates the a csv file using the WetLab mkv dataset files as input.
+
     :param feature_tracks: tracks which contain the features that are to be used from the wetlab mkvs
     :param label_tracks: tracks which contain the labels that are to be used from the wetlab mkvs
     :param directory: directory where the resulting csv is to be saved to
-    :param sample_rate: sampling rate 
-    :return: pandas dataframe containing wetlab features
+    :param sample_rate: sampling rate
+
+    :return pandas dataframe containing wetlab features
     """
     filenames = sorted(glob(os.path.join(directory, '*.mkv')))
     # obtain unique labels
@@ -66,6 +69,14 @@ def create_wetlab_data_from_mkvs(feature_tracks, label_tracks, directory, sample
 
 
 def create_sbhar_dataset(folder):
+    """
+    Function to create SBHAR dataset (containing only acceleration data).
+
+    :param folder: folder in which raw data is contained
+
+    :return pandas dataframe containing all data
+    """
+
     labels = np.loadtxt(os.path.join(folder, 'labels.txt'), delimiter=' ')
     acc_data = [f for f in os.listdir(folder) if 'acc' in f]
     # gyro_data = [f for f in os.listdir(folder) if 'gyro' in f]
@@ -103,6 +114,13 @@ def create_sbhar_dataset(folder):
 
 
 def create_hhar_dataset(folder):
+    """
+    Function to create HHAR dataset (containing only acceleration data).
+
+    :param folder: folder in which raw data is contained
+
+    :return pandas dataframe containing all data
+    """
     data = pd.read_csv(os.path.join(folder, 'Watch_accelerometer.csv'))
 
     user_dict = {
@@ -126,8 +144,12 @@ def create_hhar_dataset(folder):
 
 def create_rwhar_dataset(folder):
     """
-    Author : Sandeep Ramachandra, sandeep.ramachandra@student.uni-siegen.de
-    :return:
+    Function to create RWHAR dataset (containing only acceleration data).
+
+    Original Author : Sandeep Ramachandra, sandeep.ramachandra@student.uni-siegen.de
+    Modified by: Marius Bock
+
+    :return: pandas dataframe containing all data
     """
     RWHAR_ACTIVITY_NUM = {
         "climbingdown": 1,
@@ -247,6 +269,14 @@ def create_rwhar_dataset(folder):
 
 
 def create_opportunity_dataset(folder, output_folder):
+    """
+    Funtion to create Opportunity dataset. Saves both data used in Ordonez et al. as well as full dataset. Preprocessing
+    same as Ordonez et al.
+
+    :param folder: folder name where Opportunity zip file lies
+    :param output_folder: folder where to save the final datasets
+    """
+
     # Hardcoded number of sensor channels employed in the OPPORTUNITY challenge
     NB_SENSOR_CHANNELS = 113
 

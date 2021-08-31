@@ -1,4 +1,6 @@
 import math
+import os
+
 from sklearn.metrics import precision_score, recall_score, f1_score, jaccard_score
 import time
 import numpy as np
@@ -9,6 +11,8 @@ from sklearn.utils import class_weight
 from torch import nn
 from torch.utils.data import DataLoader
 
+from misc.osutils import mkdir_if_missing
+from misc.torchutils import count_parameters
 from model.DeepConvLSTM import ConvBlock, ConvBlockSkip, ConvBlockFixup
 
 
@@ -21,6 +25,7 @@ def init_weights(network):
     :return: network with initialised weights
     """
     for m in network.modules():
+        # normal convblock and skip convblock initialisation
         if isinstance(m, (ConvBlock, ConvBlockSkip)):
             if network.weights_init == 'normal':
                 torch.nn.init.normal_(m.conv1.weight)
@@ -42,10 +47,12 @@ def init_weights(network):
                 torch.nn.init.kaiming_normal_(m.conv2.weight)
             m.conv1.bias.data.fill_(0.0)
             m.conv2.bias.data.fill_(0.0)
+        # fixup block initialisation (see fixup paper for details)
         elif isinstance(m, ConvBlockFixup):
             nn.init.normal_(m.conv1.weight, mean=0, std=np.sqrt(
                 2 / (m.conv1.weight.shape[0] * np.prod(m.conv1.weight.shape[2:]))) * network.nb_conv_blocks ** (-0.5))
             nn.init.constant_(m.conv2.weight, 0)
+        # linear layers
         elif isinstance(m, nn.Linear):
             if network.use_fixup:
                 nn.init.constant_(m.weight, 0)
@@ -62,6 +69,7 @@ def init_weights(network):
             elif network.weights_init == 'kaiming_normal':
                 torch.nn.init.kaiming_normal_(m.weight)
             nn.init.constant_(m.bias, 0)
+        # LSTM initialisation
         elif isinstance(m, nn.LSTM):
             for name, param in m.named_parameters():
                 if 'weight_ih' in name:
@@ -95,24 +103,25 @@ def init_weights(network):
     return network
 
 
-def plot_grad_flow(named_parameters):
+def plot_grad_flow(network):
     """
     Function which plots the average gradient of a network.
 
-    :param named_parameters: parameters of the network (used to obtain gradient)
+    :param network: network used to obtain gradient
     :return: plot containing the plotted average gradient
     """
+    named_parameters = network.named_parameters()
     ave_grads = []
     layers = []
     for n, p in named_parameters:
         if p.requires_grad and "bias" not in n:
             layers.append(n)
-            ave_grads.append(p.grad.abs().mean())
+            ave_grads.append(p.grad.abs().mean().cpu())
     plt.plot(ave_grads, alpha=0.3, color="b")
     plt.hlines(0, 0, len(ave_grads) + 1, linewidth=1, color="k")
     plt.xticks(range(0, len(ave_grads), 1), layers, rotation="vertical")
     plt.xlim(xmin=0, xmax=len(ave_grads))
-    plt.xlabel("Layers")
+    plt.xlabel("layers")
     plt.ylabel("average gradient")
     plt.title("Gradient flow")
     plt.grid(True)
@@ -124,7 +133,7 @@ def init_optimizer_and_loss(network, optimizer, loss, lr, weight_decay, class_we
 
     :param network: network for which optimizer and loss are to be initialised
     :param optimizer: type of optimizer to initialise (choose between 'adadelta' 'adam' or 'rmsprop')
-    :param loss: type of loss to initialise (currently only 'cross-entropy' supported)
+    :param loss: type of loss to initialise (currently only 'cross_entropy' supported)
     :param lr: learning rate employed in optimizer
     :param weight_decay: weight decay employed in optimizer
     :param class_weights: class weights array to use during CEE loss calculation
@@ -138,40 +147,13 @@ def init_optimizer_and_loss(network, optimizer, loss, lr, weight_decay, class_we
         opt = torch.optim.Adam(network.parameters(), lr=lr, weight_decay=weight_decay)
     elif optimizer == 'rmsprop':
         opt = torch.optim.RMSprop(network.parameters(), lr=lr, weight_decay=weight_decay)
-    if loss == 'cross-entropy':
+    if loss == 'cross_entropy':
         criterion = nn.CrossEntropyLoss(weight=torch.FloatTensor(class_weights).to(gpu_name))
     return opt, criterion
 
 
-def adjust_lr(opt, lr_pt_counter, es_pt_counter, best_loss, curr_loss, args):
-    """
-    Function to adjust learning rate inbetween epochs.
-
-    Args:
-        opt -- update parameters of optimizer
-        epoch -- epoch number
-        args -- train arguments
-    """
-    if best_loss < curr_loss:
-        lr_pt_counter += 1
-        es_pt_counter += 1
-        if lr_pt_counter > args['adj_lr_patience'] and args['adj_lr']:
-            args['lr'] *= 0.1
-            print('Changing learning rate to {} since no loss improvement over {} epochs.'.format(args['lr'], str(lr_pt_counter)))
-            for param_group in opt.param_groups:
-                param_group['lr'] = param_group['lr'] * 0.1
-        if es_pt_counter > args['es_patience'] and args['early_stopping']:
-            print('Stopping training early since no loss improvement over {} epochs.'.format(str(es_pt_counter)))
-            return best_loss, lr_pt_counter, es_pt_counter, False, True
-        return best_loss, lr_pt_counter, es_pt_counter, False, False
-    else:
-        lr_pt_counter = 0
-        es_pt_counter = 0
-        best_loss = curr_loss
-        return best_loss, lr_pt_counter, es_pt_counter, True, False
-
-
-def train(train_features, train_labels, val_features, val_labels, test_features, test_labels, network, config):
+def train(train_features, train_labels, val_features, val_labels, test_features, test_labels, network, config,
+          log_date, log_timestamp):
     """
     Method to train a PyTorch network.
 
@@ -179,27 +161,26 @@ def train(train_features, train_labels, val_features, val_labels, test_features,
     :param train_labels: training labels
     :param val_features: validation features
     :param val_labels: validation labels
+    :param test_features: test features (if used)
+    :param test_labels: test labels (if used)
     :param network: DeepConvLSTM network object
-    :param config: config file which contains all training and hyperparameter settings; these include:
-        - epochs: number of epochs used during training
-        - batch_size: employed batch size
-        - optimizer: employed optimizer (choose between 'adadelta' 'adam' or 'rmsprop')
-        - loss: employed loss (currently only 'cross-entropy' supported)
-        - lr: employed learning rate
-        - weight_decay: employed weight decay
-        - class_weights: class weights used to calculate CE loss
-        - gpu: name of the GPU to use for training/ prediction
-        - verbose: boolean whether to print losses within epochs
-        - print_freq: frequency (no. batches) in which losses are provided within epochs
-        - print_counts: boolean whether to print predicted classes for train and test dataset
-        - plot_gradient: boolean whether to print gradient
-    :return: numpy array containing (predictions, gt labels)
+    :param config: config file which contains all training and hyperparameter settings
+    :param log_date: date used for logging
+    :param log_timestamp: timestamp used for logging
+
+    :return three numpy arrays containing validation, training and test predictions (predictions, gt labels)
     """
-    print("Number of Parameters: ")
-    print(sum(p.numel() for p in network.parameters()))
+
+    # prints the number of learnable parameters in the network
+    count_parameters(network)
+
+    # init network using weight initialization of choice
     network = init_weights(network)
+    # send network to GPU
     network.to(config['gpu'])
     network.train()
+
+    # if weighted loss chosen, calculate weights based on training dataset; else each class is weighted equally
     if config['use_weights']:
         class_weights = class_weight.compute_class_weight('balanced', classes=np.unique(train_labels + 1), y=train_labels + 1)
         print('Applied weighted class weights: ')
@@ -207,35 +188,54 @@ def train(train_features, train_labels, val_features, val_labels, test_features,
     else:
         class_weights = class_weight.compute_class_weight(None, classes=np.unique(train_labels + 1), y=train_labels + 1)
 
+    # initialize optimizer and loss
     opt, criterion = init_optimizer_and_loss(network, config['optimizer'], config['loss'], config['lr'],
                                              config['weight_decay'], class_weights, config['gpu'])
-    best_loss = 999999
+
+    # counters and objects used for early stopping and learning rate adjustment
+    best_loss = np.inf
+    best_network = None
     best_val_losses = None
     best_train_losses = None
-    best_preds = None
+    best_val_preds = None
+    best_train_preds = None
+    early_stop = False
     lr_pt_counter = 0
     es_pt_counter = 0
-    # iterate through number of epochs
+
+    # training loop; iterates through epochs
     for e in range(config['epochs']):
+        """
+        TRAINING
+        """
+        # helper objects
         train_losses = []
         start_time = time.time()
         batch_num = 1
-        dataset = torch.utils.data.TensorDataset(torch.from_numpy(train_features), torch.from_numpy(train_labels))
 
+        # initialize train dataset and loader
+        dataset = torch.utils.data.TensorDataset(torch.from_numpy(train_features), torch.from_numpy(train_labels))
         trainloader = DataLoader(dataset,
                                  batch_size=config['batch_size'],
                                  num_workers=2,
                                  shuffle=False,
                                  )
+
+        # iterate over train dataset
         for i, (x, y) in enumerate(trainloader):
+            # send x and y to GPU
             inputs, targets = x.to(config['gpu']), y.to(config['gpu'])
             # zero accumulated gradients
             opt.zero_grad()
+            # send inputs through network to get predictions, calculate loss and backpropagate
             output = network(inputs)
             loss = criterion(output, targets.long())
             loss.backward()
             opt.step()
+            # append train loss to list
             train_losses.append(loss.item())
+
+            # if verbose print out batch wise results (batch number, loss and time)
             if config['verbose']:
                 if batch_num % config['print_freq'] == 0 and batch_num > 0:
                     cur_loss = np.mean(train_losses)
@@ -244,21 +244,24 @@ def train(train_features, train_labels, val_features, val_labels, test_features,
                           'train loss {:5.2f}'.format(e, batch_num, elapsed * 1000 / config['batch_size'], cur_loss))
                     start_time = time.time()
                 batch_num += 1
-            if config['plot_gradient']:
-                plot_grad_flow(network.named_parameters())
+
+            # plot gradient flow if wanted
+            if config['save_gradient_plot']:
+                plot_grad_flow(network)
 
         """
         VALIDATION
         """
-        # initialise hidden state for validation
+
+        # helper objects
         val_preds = []
         val_gt = []
         val_losses = []
         train_preds = []
         train_gt = []
 
-        dataset = torch.utils.data.TensorDataset(torch.from_numpy(val_features).float(),
-                                                 torch.from_numpy(val_labels))
+        # initialize train dataset and loader
+        dataset = torch.utils.data.TensorDataset(torch.from_numpy(val_features).float(), torch.from_numpy(val_labels))
         valloader = DataLoader(dataset,
                                batch_size=config['batch_size'],
                                num_workers=2,
@@ -268,28 +271,41 @@ def train(train_features, train_labels, val_features, val_labels, test_features,
         # set network to eval mode
         network.eval()
         with torch.no_grad():
+            # iterate over validation dataset
             for i, (x, y) in enumerate(valloader):
+                # send x and y to GPU
                 inputs, targets = x.to(config['gpu']), y.to(config['gpu'])
+
+                # send inputs through network to get predictions, loss and calculate softmax probabilities
                 val_output = network(inputs)
                 val_loss = criterion(val_output, targets.long())
-                if math.isnan(val_loss):
-                    print(val_output)
-                    print(targets.long())
-                val_losses.append(val_loss.item())
                 val_output = torch.nn.functional.softmax(val_output, dim=1)
+
+                # append validation loss to list
+                val_losses.append(val_loss.item())
+
+                # create predictions and append them to final list
                 y_preds = np.argmax(val_output.cpu().numpy(), axis=-1)
                 y_true = targets.cpu().numpy().flatten()
                 val_preds = np.concatenate((np.array(val_preds, int), np.array(y_preds, int)))
                 val_gt = np.concatenate((np.array(val_gt, int), np.array(y_true, int)))
+
+            # iterate over train dataset
             for i, (x, y) in enumerate(trainloader):
+                # send x and y to GPU
                 inputs, targets = x.to(config['gpu']), y.to(config['gpu'])
+
+                # send inputs through network to get predictions and calculate softmax probabilities
                 train_output = network(inputs)
                 train_output = torch.nn.functional.softmax(train_output, dim=1)
+
+                # create predictions and append them to final list
                 y_preds = np.argmax(train_output.cpu().numpy(), axis=-1)
                 y_true = targets.cpu().numpy().flatten()
                 train_preds = np.concatenate((np.array(train_preds, int), np.array(y_preds, int)))
                 train_gt = np.concatenate((np.array(train_gt, int), np.array(y_true, int)))
 
+            # print epoch evaluation results for train and validation dataset
             print("EPOCH: {}/{}".format(e + 1, config['epochs']),
                   "Train Loss: {:.4f}".format(np.mean(train_losses)),
                   "Train Acc: {:.4f}".format(jaccard_score(train_gt, train_preds, average='macro')),
@@ -302,6 +318,7 @@ def train(train_features, train_labels, val_features, val_labels, test_features,
                   "Val Rcll: {:.4f}".format(recall_score(val_gt, val_preds, average='macro')),
                   "Val F1: {:.4f}".format(f1_score(val_gt, val_preds, average='macro')))
 
+            # if chosen, print the value counts of the predicted labels for train and validation dataset
             if config['print_counts']:
                 y_train = np.bincount(train_preds)
                 ii_train = np.nonzero(y_train)[0]
@@ -312,42 +329,106 @@ def train(train_features, train_labels, val_features, val_labels, test_features,
                 print('Predicted Val Labels: ')
                 print(np.vstack((ii_val, y_val[ii_val])).T)
 
-        network.train()
+        # if adjust learning rate is enabled
         if config['adj_lr'] or config['early_stopping']:
-            best_loss, lr_pt_counter, es_pt_counter, improvement, stop = adjust_lr(opt, lr_pt_counter, es_pt_counter, best_loss, np.mean(val_losses), config)
-            if improvement:
-                best_train_losses = train_losses
-                best_val_losses = val_losses
-                best_preds = val_preds
-            if stop:
-                return best_train_losses, best_val_losses, np.vstack((best_preds, val_gt)).T
+            if best_loss < np.mean(val_losses):
+                lr_pt_counter += 1
+                es_pt_counter += 1
 
+                # adjust learning rate check
+                if lr_pt_counter >= config['adj_lr_patience'] and config['adj_lr']:
+                    config['lr'] *= 0.1
+                    for param_group in opt.param_groups:
+                        param_group['lr'] = param_group['lr'] * 0.1
+                    print('Changing learning rate to {} since no loss improvement over {} epochs.'
+                          .format(config['lr'], str(lr_pt_counter)))
+
+                # early stopping check
+                if es_pt_counter >= config['es_patience'] and config['early_stopping']:
+                    print('Stopping training early since no loss improvement over {} epochs.'
+                          .format(str(es_pt_counter)))
+                    early_stop = True
+                    # print results of best epoch
+                    print('Final (best) results: ')
+                    print("Train Loss: {:.4f}".format(np.mean(best_train_losses)),
+                          "Train Acc: {:.4f}".format(jaccard_score(train_gt, best_train_preds, average='macro')),
+                          "Train Prec: {:.4f}".format(precision_score(train_gt, best_train_preds, average='macro')),
+                          "Train Rcll: {:.4f}".format(recall_score(train_gt, best_train_preds, average='macro')),
+                          "Train F1: {:.4f}".format(f1_score(train_gt, best_train_preds, average='macro')),
+                          "Val Loss: {:.4f}".format(np.mean(best_val_losses)),
+                          "Val Acc: {:.4f}".format(jaccard_score(val_gt, best_val_preds, average='macro')),
+                          "Val Prec: {:.4f}".format(precision_score(val_gt, best_val_preds, average='macro')),
+                          "Val Rcll: {:.4f}".format(recall_score(val_gt, best_val_preds, average='macro')),
+                          "Val F1: {:.4f}".format(f1_score(val_gt, best_val_preds, average='macro')))
+
+            else:
+                lr_pt_counter = 0
+                es_pt_counter = 0
+                best_network = network
+                best_loss = np.mean(val_losses)
+                best_train_losses = train_losses
+                best_train_preds = train_preds
+                best_val_losses = val_losses
+                best_val_preds = val_preds
+        else:
+            best_network = network
+            best_train_losses = train_losses
+            best_train_preds = train_preds
+            best_val_losses = val_losses
+            best_val_preds = val_preds
+
+        # set network to train mode again
+        network.train()
+
+        if early_stop:
+            break
+
+    """
+    TESTING
+    """
+    # if test set not empty
     if test_features.size != 0 and config['valid_type'] == 'normal':
+        # set network to eval mode
+        network.eval()
+
+        # helper objects
         test_preds = []
         test_gt = []
 
-        dataset = torch.utils.data.TensorDataset(torch.from_numpy(test_features).float(),
-                                                 torch.from_numpy(test_labels))
+        # initialize test dataset and loader
+        dataset = torch.utils.data.TensorDataset(torch.from_numpy(test_features).float(), torch.from_numpy(test_labels))
         testloader = DataLoader(dataset,
                                 batch_size=config['batch_size'],
                                 num_workers=2,
                                 shuffle=False,
                                 )
+
         with torch.no_grad():
+            # iterate over test dataset
             for i, (x, y) in enumerate(testloader):
+                # send x and y to GPU
                 inputs, targets = x.to(config['gpu']), y.to(config['gpu'])
+
+                # send inputs through network to get predictions and calculate softmax probabilities
                 test_output = network(inputs)
                 test_output = torch.nn.functional.softmax(test_output, dim=1)
+
+                # create predictions and append them to final list
                 y_preds = np.argmax(test_output.cpu().numpy(), axis=-1)
                 y_true = targets.cpu().numpy().flatten()
                 test_preds = np.concatenate((np.array(test_preds, int), np.array(y_preds, int)))
                 test_gt = np.concatenate((np.array(test_gt, int), np.array(y_true, int)))
+
+            # create test output
             test_output = np.vstack((test_preds, test_gt)).T
     else:
+        # if test set empty create empty test output
         test_output = None
 
     # if plot_gradient gradient plot is shown at end of training
-    if config['plot_gradient']:
-        plt.show()
+    if config['save_gradient_plot']:
+        mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
+        plt.savefig(os.path.join('logs', log_date, log_timestamp, 'grad_flow.png'))
 
-    return np.vstack((val_preds, val_gt)).T, np.vstack((train_preds, train_gt)).T, test_output
+    # return validation, train and test predictions as numpy array with ground truth
+    return best_network, np.vstack((best_val_preds, val_gt)).T, np.vstack((best_train_preds, train_gt)).T, test_output

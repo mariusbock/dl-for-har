@@ -13,6 +13,17 @@ from model.train import train
 
 
 def cross_participant_cv(data, args, log_date, log_timestamp):
+    """
+    Method to apply cross-participant cross-validation (also known as leave-one-subject-out cross-validation).
+
+    :param data: data used for applying cross-validation
+    :param args: args object containing all relevant hyperparameters and settings
+    :param log_date: date information needed for saving
+    :param log_timestamp: timestamp information needed for saving
+
+    :return trained network
+    """
+
     print(' Calculating cross-participant scores using LOSO CV.')
     cp_scores = np.zeros((4, args.nb_classes, int(np.max(data[:, 0]) + 1)))
     train_val_gap = np.zeros((4, int(np.max(data[:, 0]) + 1)))
@@ -50,8 +61,9 @@ def cross_participant_cv(data, args, log_date, log_timestamp):
         else:
             print("Did not provide a valid network name!")
 
-        val_output, train_output, _ = train(X_train, y_train, X_val, y_val, X_test, y_test,
-                                            network=net, config=vars(args))
+        net, val_output, train_output, _ = train(X_train, y_train, X_val, y_val, X_test, y_test,
+                                                 network=net, config=vars(args), log_date=log_date,
+                                                 log_timestamp=log_timestamp)
 
         if all_eval_output is None:
             all_eval_output = val_output
@@ -100,6 +112,17 @@ def cross_participant_cv(data, args, log_date, log_timestamp):
 
 
 def per_participant_cv(data, args, log_date, log_timestamp):
+    """
+    Method to apply per-participant cross-validation.
+
+    :param data: data used for applying cross-validation
+    :param args: args object containing all relevant hyperparameters and settings
+    :param log_date: date information needed for saving
+    :param log_timestamp: timestamp information needed for saving
+
+    :return trained network
+    """
+
     print('Calculating per-participant scores using stratified random split.')
     pp_scores = np.zeros((4, args.nb_classes, int(np.max(data[:, 0]) + 1)))
     all_eval_output = None
@@ -158,8 +181,9 @@ def per_participant_cv(data, args, log_date, log_timestamp):
             else:
                 print("Did not provide a valid network name!")
 
-            val_output, train_output, _ = train(X_train, y_train, X_val, y_val, X_test, y_test,
-                                                network=net, config=vars(args))
+            net, val_output, train_output, _ = train(X_train, y_train, X_val, y_val, X_test, y_test,
+                                                     network=net, config=vars(args), log_date=log_date,
+                                                     log_timestamp=log_timestamp)
 
             if all_eval_output is None:
                 all_eval_output = val_output
@@ -213,6 +237,22 @@ def per_participant_cv(data, args, log_date, log_timestamp):
 
 
 def normal_cv(X_train, y_train, X_val, y_val, X_test, y_test, args, log_date, log_timestamp):
+    """
+    Method to apply normal cross-validation, i.e. one set split into train, validation and testing data.
+
+    :param X_train: train features used for applying cross-validation
+    :param y_train: train labels used for applying cross-validation
+    :param X_val: validation features used for applying cross-validation
+    :param y_val: validation labels used for applying cross-validation
+    :param X_test: test features used for applying cross-validation
+    :param y_test: test labels used for applying cross-validation
+    :param args: args object containing all relevant hyperparameters and settings
+    :param log_date: date information needed for saving
+    :param log_timestamp: timestamp information needed for saving
+
+    :return trained network
+    """
+
     # Sensor data is segmented using a sliding window mechanism
     X_train, y_train = apply_sliding_window(args.dataset, X_train, y_train,
                                             sliding_window_size=args.sw_length,
@@ -243,8 +283,9 @@ def normal_cv(X_train, y_train, X_val, y_val, X_test, y_test, args, log_date, lo
     else:
         print("Did not provide a valid network name!")
 
-    val_output, train_output, test_output = train(X_train, y_train, X_val, y_val, X_test, y_test,
-                                                  network=net, config=vars(args))
+    net, val_output, train_output, test_output = train(X_train, y_train, X_val, y_val, X_test, y_test,
+                                                       network=net, config=vars(args), log_date=log_date,
+                                                       log_timestamp=log_timestamp)
 
     cls = np.array(range(args.nb_classes))
     print('VALIDATION RESULTS: ')

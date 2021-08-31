@@ -65,7 +65,7 @@ NETWORK OPTIONS:
 
 NETWORK = 'deepconvlstm'
 NB_UNITS_LSTM = 128
-NB_LAYERS_LSTM = 2
+NB_LAYERS_LSTM = 1
 CONV_BLOCK_TYPE = 'normal'
 NB_CONV_BLOCKS = 2
 NB_FILTERS = 64
@@ -81,60 +81,60 @@ REDUCE_LAYER_OUTPUT = 8
 
 """
 TRAINING OPTIONS:
-- SEED: 
-- VALID_TYPE:
-- BATCH_SIZE:
-- EPOCHS:
-- OPTIMIZER: 
-- LR: 
-- WEIGHT_DECAY: 
-- WEIGHTS_INIT:
-- LOSS: 
-- GPU: 
-- SPLITS_SSS: 
-- USE_WEIGHTS:
-- ADJ_LR: 
-- EARLY_STOPPING: 
-- ADJ_LR_PATIENCE: 
-- ES_PATIENCE: 
+- SEED: random seed which is to be employed
+- VALID_TYPE: (cross-)validation type; either 'cross-participant', 'per-participant' or 'normal'
+- BATCH_SIZE: size of the batches
+- EPOCHS: number of epochs during training
+- OPTIMIZER: optimizer to use; either 'rmsprop', 'adadelta' or 'adam'
+- LR: learning rate to employ for optimizer
+- WEIGHT_DECAY: weight decay to employ for optimizer
+- WEIGHTS_INIT: weight initialization method to use to initialize network
+- LOSS: loss to use; currently only 'cross_entropy' supported
+- GPU: name of GPU to use (e.g. 'cuda:0')
+- SPLITS_SSS: number of stratified splits for each subject in per-participant evaluation
+- USE_WEIGHTS: boolean whether to use weighted loss calculation based on support of each class
+- ADJ_LR: boolean whether to adjust learning rate if no improvement
+- EARLY_STOPPING: boolean whether to stop the network training early if no improvement 
+- ADJ_LR_PATIENCE: patience (i.e. number of epochs) after which learning is adjusted if no improvement
+- ES_PATIENCE: patience (i.e. number of epochs) after which network training is stopped if no improvement
 """
 
 SEED = 1
 VALID_TYPE = 'cross-participant'
 BATCH_SIZE = 100
-EPOCHS = 1
+EPOCHS = 30
 OPTIMIZER = 'adam'
 LR = 1e-4
 WEIGHT_DECAY = 1e-6
 WEIGHTS_INIT = 'xavier_normal'
-LOSS = 'cross-entropy'
+LOSS = 'cross_entropy'
 GPU = 'cuda:0'
 SPLITS_SSS = 2
 SIZE_SSS = 0.6
 USE_WEIGHTS = True
 ADJ_LR = False
 EARLY_STOPPING = False
-ADJ_LR_PATIENCE = 2
+ADJ_LR_PATIENCE = 5
 ES_PATIENCE = 5
 
 """
 LOGGING OPTIONS:
 - LOGGING: boolean whether to log console outputs in a text file
 - PRINT_COUNTS: boolean whether to print the distribution of predicted labels after each epoch 
-- PLOT_GRADIENT: boolean whether to plot the gradient flow throughout epochs
 - VERBOSE: boolean whether to print batchwise results during epochs
 - PRINT_FREQ: number of batches after which batchwise results are printed
 - SAVE_TEST_PREDICTIONS: boolean whether to save test predictions
 - SAVE_MODEL: boolean whether to save the model after last epoch as pickle file
+- SAVE_GRADIENT_PLOT: boolean whether to save the gradient flow plot
 """
 
 LOGGING = False
 PRINT_COUNTS = False
-PLOT_GRADIENT = False
 VERBOSE = False
 PRINT_FREQ = 100
-SAVE_TEST_PREDICTIONS = True
-SAVE_MODEL = True
+SAVE_TEST_PREDICTIONS = False
+SAVE_MODEL = False
+SAVE_GRADIENT_PLOT = False
 
 
 def main(args):
@@ -168,6 +168,7 @@ def main(args):
     if args.dataset == 'opportunity_ordonez':
         args.valid_type = 'normal'
 
+    # if selected compute means and standard deviations of each column and append to dataset
     if args.means_and_stds:
         X_train = np.concatenate((X_train, compute_mean_and_std(X_train[:, 1:])), axis=1)
         X_val = np.concatenate((X_val, compute_mean_and_std(X_val[:, 1:])), axis=1)
@@ -175,7 +176,10 @@ def main(args):
 
     ############################################# TRAINING #############################################################
 
+    # apply the chosen random seed to all relevant parts
     seed_torch(args.seed)
+
+    # create full dataset for cross-participant and per-participant evaluation
     if X_test.size != 0:
         X = np.concatenate((X_train, X_val, X_test), axis=0)
         y = np.concatenate((y_train, y_val, y_test), axis=0)
@@ -184,6 +188,7 @@ def main(args):
         y = np.concatenate((y_train, y_val), axis=0)
     data = np.concatenate((X, (np.array(y)[:, None])), axis=1)
 
+    # cross-validation; either cross-participant, per-participant or normal
     if args.valid_type == 'cross-participant':
         trained_net = cross_participant_cv(data, args, log_date, log_timestamp)
     elif args.valid_type == 'per-participant':
@@ -191,8 +196,7 @@ def main(args):
     elif args.valid_type == 'normal':
         trained_net = normal_cv(X_train, y_train, X_val, y_val, X_test, y_test, args, log_date, log_timestamp)
 
-    # TODO: implement k-fold
-
+    # if selected, save model as pickle file
     if args.save_model:
         mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
         pickle.dump(trained_net, open(os.path.join('logs', log_date, log_timestamp, 'trained_model.sav'), 'wb'))
@@ -217,7 +221,7 @@ if __name__ == '__main__':
                         help='if verbose, frequency of which is printed (batches)')
     parser.add_argument('--print_counts', default=PRINT_COUNTS, type=bool,
                         help='print class distribution of train and validation set after epochs')
-    parser.add_argument('--plot_gradient', default=PLOT_GRADIENT, type=bool, help='plot gradient development as plot')
+    parser.add_argument('--save_gradient_plot', default=SAVE_GRADIENT_PLOT, type=bool, help='save gradient flow plot')
     parser.add_argument('--include_null', default=INCLUDE_NULL, type=bool,
                         help='include null class (if dataset has one) in training/ prediction')
     parser.add_argument('--cutoff_train', default=CUTOFF_TRAIN, type=int,
@@ -253,7 +257,7 @@ if __name__ == '__main__':
     parser.add_argument('--drop_prob', default=DROP_PROB, type=float, help='dropout probability before classifier')
     parser.add_argument('--optimizer', default=OPTIMIZER, type=str,
                         help='optimizer to be used (adam, rmsprop, adadelta)')
-    parser.add_argument('--loss', default=LOSS, type=str, help='loss to be used (cross-entropy)')
+    parser.add_argument('--loss', default=LOSS, type=str, help='loss to be used (e.g. cross_entropy)')
     parser.add_argument('--lr', default=LR, type=float, help='learning rate to be used')
     parser.add_argument('--gpu', default=GPU, type=str, help='gpu to be used (e.g. cuda:1)')
     parser.add_argument('--adj_lr', default=ADJ_LR, type=bool, help='adjust learning rate')
