@@ -53,10 +53,12 @@ def load_dataset(dataset, cutoff_train, cutoff_valid, pred_type='actions', inclu
 
     X_train = X_train.astype(np.float32)
     X_val = X_val.astype(np.float32)
+    X_test = X_test.astype(np.float32)
 
     # The targets are casted to int8 for GPU compatibility.
     y_train = y_train.astype(np.uint8)
     y_val = y_val.astype(np.uint8)
+    y_test = y_test.astype(np.uint8)
 
     if has_null and include_null:
         class_names = ['null'] + class_names
@@ -64,17 +66,18 @@ def load_dataset(dataset, cutoff_train, cutoff_valid, pred_type='actions', inclu
     return X_train, y_train, X_val, y_val, X_test, y_test, len(class_names), class_names, sampling_rate, has_null
 
 
-def preprocess_data(data, dataset, cutoff_train, cutoff_valid, pred_type='actions', has_null=False, include_null=True):
+def preprocess_data(data, ds, cot, cov, pt='actions', has_null=False, include_null=True):
     """
     Function to preprocess the wetlab dataset according to settings.
-
-    :param dataset: string
-        Wetlab data
-    :param cutoff_train: integer
+    :param data: pandas dataframe
+        Dataframe containing all data
+    :param ds: string
+        Name of dataset
+    :param cot: integer
         Subject number up to which to contain in the training dataset
-    :param cutoff_valid: integer
+    :param cov: integer
         Subject number up to which to contain in the validation dataset. All other sequences will be test.
-    :param pred_type: string, ['actions' (default), 'tasks']
+    :param pt: string, ['actions' (default), 'tasks']
         Type of labels that are to be used
     :param has_null: boolean, default: True
         Boolean signaling whether dataset has a null class
@@ -83,64 +86,66 @@ def preprocess_data(data, dataset, cutoff_train, cutoff_valid, pred_type='action
     :return numpy float arrays
         Training and validation datasets that can be used for training
     """
-    print('Processing dataset files ...')
-    if dataset == 'opportunity_ordonez':
-        if pred_type == 'locomotion':
-            X_train, y_train = data.iloc[:497014, 1:114], data.iloc[:497014, -2]
-            X_val, y_val = data.iloc[497014:557963, 1:114], data.iloc[497014:557963:, -2]
-            X_test, y_test = data.iloc[557963:, 1:114], data.iloc[557963:, -2]
-        elif pred_type == 'gestures':
-            X_train, y_train = data.iloc[:497014, 1:114], data.iloc[:497014, -1]
-            X_val, y_val = data.iloc[497014:557963, 1:114], data.iloc[497014:557963:, -1]
-            X_test, y_test = data.iloc[557963:, 1:114], data.iloc[557963:, -1]
-    elif has_null:
-        if (dataset == 'wetlab' and pred_type == "actions" and not include_null) or \
-           (dataset == 'opportunity' and pred_type == "gestures" and not include_null):
-            train = data[(data.iloc[:, 0] <= cutoff_train)
-                         & (data.iloc[:, -2] != '0') & (data.iloc[:, -2] != 0)]
-            val = data[(data.iloc[:, 0] <= cutoff_valid) & (data.iloc[:, 0] > cutoff_train)
-                       & (data.iloc[:, -2] != '0') & (data.iloc[:, -2] != 0)]
-            test = data[(data.iloc[:, 0] > cutoff_valid) & (data.iloc[:, -2] != '0') & (data.iloc[:, -2] != 0)]
-        elif not include_null:
-            train = data[(data.iloc[:, 0] <= cutoff_train)
-                         & (data.iloc[:, -1] != '0') & (data.iloc[:, -1] != 0)]
-            val = data[(data.iloc[:, 0] <= cutoff_valid) & (data.iloc[:, 0] > cutoff_train)
-                       & (data.iloc[:, -1] != '0') & (data.iloc[:, -1] != 0)]
-            test = data[(data.iloc[:, 0] > cutoff_valid) & (data.iloc[:, -1] != '0') & (data.iloc[:, -1] != 0)]
-        else:
-            train = data[(data.iloc[:, 0] <= cutoff_train)]
-            val = data[(data.iloc[:, 0] <= cutoff_valid) & (data.iloc[:, 0] > cutoff_train)]
-            test = data[(data.iloc[:, 0] > cutoff_valid)]
-    else:
-        train = data[(data.iloc[:, 0] <= cutoff_train)]
-        val = data[(data.iloc[:, 0] <= cutoff_valid) & (data.iloc[:, 0] > cutoff_train)]
-        test = data[(data.iloc[:, 0] > cutoff_valid)]
 
-    if (dataset == 'wetlab' and pred_type == 'actions') or (dataset == 'opportunity' and pred_type == "locomotion"):
+    print('Processing dataset files ...')
+    if ds == 'opportunity_ordonez':
+        train = data.iloc[:497014, :]
+        val = data.iloc[497014:557963, :]
+        test = data.iloc[557963:, :]
+
+    if has_null:
+        if include_null:
+            if ds == 'opportunity_ordonez':
+                pass
+            else:
+                train = data[(data.iloc[:, 0] <= cot)]
+                val = data[(data.iloc[:, 0] <= cov) & (data.iloc[:, 0] > cot)]
+                test = data[(data.iloc[:, 0] > cov)]
+        else:
+            if (ds == 'wetlab' and pt == 'actions') or (ds == 'opportunity' and pt == 'locomotion'):
+                train = data[(data.iloc[:, 0] <= cot) & (data.iloc[:, -2] != 'null_class')]
+                val = data[(data.iloc[:, 0] <= cov) & (data.iloc[:, 0] > cot) & (data.iloc[:, -2] != 'null_class')]
+                test = data[(data.iloc[:, 0] > cov) & (data.iloc[:, -2] != 'null_class')]
+            elif ds == 'opportunity_ordonez' and pt == 'locomotion':
+                train = train[train.iloc[:, -2] != 'null_class']
+                val = val[data.iloc[:, -2] != 'null_class']
+                test = test[data.iloc[:, -2] != 'null_class']
+            elif ds == 'opportunity_ordonez' and pt == 'gestures':
+                train = train[train.iloc[:, -1] != 'null_class']
+                val = val[data.iloc[:, -1] != 'null_class']
+                test = test[data.iloc[:, -1] != 'null_class']
+            else:
+                train = data[(data.iloc[:, 0] <= cot) & (data.iloc[:, -1] != 'null_class')]
+                val = data[(data.iloc[:, 0] <= cov) & (data.iloc[:, 0] > cot) & (data.iloc[:, -1] != 'null_class')]
+                test = data[(data.iloc[:, 0] > cov) & (data.iloc[:, -1] != 'null_class')]
+    else:
+        train = data[(data.iloc[:, 0] <= cot)]
+        val = data[(data.iloc[:, 0] <= cov) & (data.iloc[:, 0] > cot)]
+        test = data[(data.iloc[:, 0] > cov)]
+
+    if (ds == 'wetlab' and pt == 'actions') or ((ds == 'opportunity' or ds == 'opportunity_ordonez') and pt == "locomotion"):
         X_train, X_val, X_test = train.iloc[:, :-2], val.iloc[:, :-2], test.iloc[:, :-2]
-        y_train = adjust_labels(train.iloc[:, -2], dataset, pred_type).astype(int)
-        y_val = adjust_labels(val.iloc[:, -2], dataset, pred_type).astype(int)
-        y_test = adjust_labels(test.iloc[:, -2], dataset, pred_type).astype(int)
-    elif dataset == 'opportunity_ordonez':
-        pass
+        y_train = adjust_labels(train.iloc[:, -2], ds, pt).astype(int)
+        y_val = adjust_labels(val.iloc[:, -2], ds, pt).astype(int)
+        y_test = adjust_labels(test.iloc[:, -2], ds, pt).astype(int)
+    elif (ds == 'wetlab' and pt == 'tasks') or ((ds == 'opportunity' or ds == 'opportunity_ordonez') and pt == "gestures"):
+        X_train, X_val, X_test = train.iloc[:, :-2], val.iloc[:, :-2], test.iloc[:, :-2]
+        y_train = adjust_labels(train.iloc[:, -1], ds, pt).astype(int)
+        y_val = adjust_labels(val.iloc[:, -1], ds, pt).astype(int)
+        y_test = adjust_labels(test.iloc[:, -1], ds, pt).astype(int)
     else:
         X_train, X_val, X_test = train.iloc[:, :-1], val.iloc[:, :-1], test.iloc[:, :-1]
-        y_train = adjust_labels(train.iloc[:, -1], dataset, pred_type).astype(int)
-        y_val = adjust_labels(val.iloc[:, -1], dataset, pred_type).astype(int)
-        y_test = adjust_labels(test.iloc[:, -1], dataset, pred_type).astype(int)
-
-    if dataset == 'rwhar':
-        y_train -= 1
-        y_val -= 1
-        y_test -= 1
+        y_train = adjust_labels(train.iloc[:, -1], ds, pt).astype(int)
+        y_val = adjust_labels(val.iloc[:, -1], ds, pt).astype(int)
+        y_test = adjust_labels(test.iloc[:, -1], ds, pt).astype(int)
 
     # if no null class in dataset subtract one from all labels
-    if has_null and not include_null and dataset != 'oppportunity_ordonez':
+    if has_null and not include_null:
         y_train -= 1
         y_val -= 1
         y_test -= 1
-    print("Final datasets with size: | train {0} | val {1} | test {2} | ".format(X_train.shape, X_val.shape,
-                                                                                 X_test.shape))
+
+    print("Final datasets with size: | train {0} | val {1} | test {2} | ".format(X_train.shape, X_val.shape, X_test.shape))
 
     return X_train.to_numpy(), y_train.to_numpy(), X_val.to_numpy(), y_val.to_numpy(), X_test.to_numpy(), y_test.to_numpy()
 
@@ -173,8 +178,8 @@ def adjust_labels(data_y, dataset, pred_type='actions'):
     :return: numpy integer array
         Modified sensor labels
     """
+    data_y[data_y == "null_class"] = 0
     if dataset == 'wetlab':
-        data_y[data_y == "0"] = 0
         if pred_type == 'tasks':  # Labels for tasks are adjusted
             data_y[data_y == "1solvent"] = 1
             data_y[data_y == "2catalysator"] = 2
@@ -214,17 +219,56 @@ def adjust_labels(data_y, dataset, pred_type='actions'):
             data_y[data_y == "stirring"] = 7
             data_y[data_y == "transfer"] = 8
     elif dataset == 'sbhar':
-        pass
+        data_y[data_y == 'walking'] = 1
+        data_y[data_y == 'walking_upstairs'] = 2
+        data_y[data_y == 'walking_downstairs'] = 3
+        data_y[data_y == 'sitting'] = 4
+        data_y[data_y == 'standing'] = 5
+        data_y[data_y == 'lying'] = 6
+        data_y[data_y == 'stand-to-sit'] = 7
+        data_y[data_y == 'sit-to-stand'] = 8
+        data_y[data_y == 'sit-to-lie'] = 9
+        data_y[data_y == 'lie-to-sit'] = 10
+        data_y[data_y == 'stand-to-lie'] = 11
+        data_y[data_y == 'lie-to-stand'] = 12
     elif dataset == 'rwhar':
-        pass
+        data_y[data_y == 'climbing_down'] = 0
+        data_y[data_y == 'climbing_up'] = 1
+        data_y[data_y == 'jumping'] = 2
+        data_y[data_y == 'lying'] = 3
+        data_y[data_y == 'running'] = 4
+        data_y[data_y == 'sitting'] = 5
+        data_y[data_y == 'standing'] = 6
+        data_y[data_y == 'walking'] = 7
     elif dataset == 'hhar':
-        data_y[data_y == 0] = 0
         data_y[data_y == 'bike'] = 1
         data_y[data_y == 'sit'] = 2
         data_y[data_y == 'stand'] = 3
         data_y[data_y == 'walk'] = 4
         data_y[data_y == 'stairsup'] = 5
         data_y[data_y == 'stairsdown'] = 6
-    elif dataset == 'opportunity':
-        pass
+    elif dataset == 'opportunity' or 'opportunity_ordonez':
+        if pred_type == 'locomotion':
+            data_y[data_y == "stand"] = 1
+            data_y[data_y == "walk"] = 2
+            data_y[data_y == "sit"] = 3
+            data_y[data_y == "lie"] = 4
+        elif pred_type == 'gestures':
+            data_y[data_y == 'open_door_1'] = 1
+            data_y[data_y == 'open_door_2'] = 2
+            data_y[data_y == 'close_door_1'] = 3
+            data_y[data_y == 'close_door_2'] = 4
+            data_y[data_y == 'open_fridge'] = 5
+            data_y[data_y == 'close_fridge'] = 6
+            data_y[data_y == 'open_dishwasher'] = 7
+            data_y[data_y == 'close_dishwasher'] = 8
+            data_y[data_y == 'open_drawer_1'] = 9
+            data_y[data_y == 'close_drawer_1'] = 10
+            data_y[data_y == 'open_drawer_2'] = 11
+            data_y[data_y == 'close_drawer_2'] = 12
+            data_y[data_y == 'open_drawer_3'] = 13
+            data_y[data_y == 'close_drawer_3'] = 14
+            data_y[data_y == 'clean_table'] = 15
+            data_y[data_y == 'drink_from_cup'] = 16
+            data_y[data_y == 'toggle_switch'] = 17
     return data_y

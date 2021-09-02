@@ -34,9 +34,9 @@ DATASET OPTIONS:
 - INCLUDE_NULL: boolean whether to include null class in datasets
 """
 
-DATASET = 'opportunity_ordonez'
-PRED_TYPE = 'gestures'
-CUTOFF_TRAIN = 20
+DATASET = 'hhar'
+PRED_TYPE = 'tasks'
+CUTOFF_TRAIN = 2
 CUTOFF_VALID = 30
 SW_LENGTH = 24
 SW_UNIT = 'units'
@@ -138,6 +138,16 @@ SAVE_GRADIENT_PLOT = False
 
 
 def main(args):
+    # check if valid prediction type chosen for dataset
+    if DATASET == 'opportunity' or DATASET == 'opportunity_ordonez':
+        if PRED_TYPE != 'gestures' and PRED_TYPE != 'locomotion':
+            print('Did not choose a valid prediction type for Opportunity dataset!')
+            exit()
+    elif DATASET == 'wetlab':
+        if PRED_TYPE != 'actions' and PRED_TYPE != 'tasks':
+            print('Did not choose a valid prediction type for Wetlab dataset!')
+            exit()
+
     # parameters used to calculate runtime
     start = time.time()
     log_date = time.strftime('%Y%m%d')

@@ -8,6 +8,8 @@ import os
 from io import BytesIO
 import zipfile
 
+pd.options.mode.chained_assignment = None
+
 
 def milliseconds_to_hertz(start, end, rate):
     """
@@ -47,8 +49,8 @@ def create_wetlab_data_from_mkvs(feature_tracks, label_tracks, directory, sample
         labels = np.vstack(read(label_tracks, file=filename)[0])
         idx = np.full(len(features), i)
         feat_output = pd.DataFrame(np.concatenate((np.array(idx)[:, None], features), axis=1))
-        action_label_output = pd.DataFrame(np.full(len(features), 0))
-        tasks_label_output = pd.DataFrame(np.full(len(features), 0))
+        action_label_output = pd.DataFrame(np.full(len(features), 'null_class'))
+        tasks_label_output = pd.DataFrame(np.full(len(features), 'null_class'))
         for label_triplet in labels:
             start, end = milliseconds_to_hertz(label_triplet[0], label_triplet[1], sample_rate)
             if any(char.isdigit() for char in label_triplet[2]):
@@ -65,6 +67,8 @@ def create_wetlab_data_from_mkvs(feature_tracks, label_tracks, directory, sample
     print(output.iloc[:, -2].value_counts())
     print("Value counts (Tasks): ")
     print(output.iloc[:, -1].value_counts())
+    output.columns = ['subject_id', 'acc_x', 'acc_y', 'acc_z', 'activity_label_1', 'activity_label_2']
+    output = output.astype({'subject_id': int, 'acc_x': float, 'acc_y': float, 'acc_z': float, 'activity_label_1': str, 'activity_label_2': str})
     return output
 
 
@@ -76,6 +80,22 @@ def create_sbhar_dataset(folder):
 
     :return pandas dataframe containing all data
     """
+
+    label_dict = {
+        0: 'null_class',
+        1: 'walking',
+        2: 'walking_upstairs',
+        3: 'walking_downstairs',
+        4: 'sitting',
+        5: 'standing',
+        6: 'lying',
+        7: 'stand-to-sit',
+        8: 'sit-to-stand',
+        9: 'sit-to-lie',
+        10: 'lie-to-sit',
+        11: 'stand-to-lie',
+        12: 'lie-to-stand'
+    }
 
     labels = np.loadtxt(os.path.join(folder, 'labels.txt'), delimiter=' ')
     acc_data = [f for f in os.listdir(folder) if 'acc' in f]
@@ -110,7 +130,11 @@ def create_sbhar_dataset(folder):
             output_data = sbj_data
         else:
             output_data = np.concatenate((output_data, sbj_data), axis=0)
-    return pd.DataFrame(output_data, index=None)
+    output_data = pd.DataFrame(output_data)
+    output_data.columns = ['subject_id', 'acc_x', 'acc_y', 'acc_z', 'activity_label']
+    output_data = output_data.replace({'activity_label': label_dict})
+    output_data = output_data.astype({'subject_id': int, 'acc_x': float, 'acc_y': float, 'acc_z': float, 'activity_label': str})
+    return output_data
 
 
 def create_hhar_dataset(folder):
@@ -124,21 +148,21 @@ def create_hhar_dataset(folder):
     data = pd.read_csv(os.path.join(folder, 'Watch_accelerometer.csv'))
 
     user_dict = {
-        'a': 0.0,
-        'b': 1.0,
-        'c': 2.0,
-        'd': 3.0,
-        'e': 4.0,
-        'f': 5.0,
-        'g': 6.0,
-        'h': 7.0,
-        'i': 8.0,
+        'a': 0,
+        'b': 1,
+        'c': 2,
+        'd': 3,
+        'e': 4,
+        'f': 5,
+        'g': 6,
+        'h': 7,
+        'i': 8,
     }
 
     data = data.replace({"User": user_dict})
 
     data = data[['User', 'x', 'y', 'z', 'gt']]
-    data = data.fillna(0)
+    data = data.fillna('null_class')
     return data
 
 
@@ -152,14 +176,14 @@ def create_rwhar_dataset(folder):
     :return: pandas dataframe containing all data
     """
     RWHAR_ACTIVITY_NUM = {
-        "climbingdown": 1,
-        "climbingup": 2,
-        "jumping": 3,
-        "lying": 4,
-        "running": 5,
-        "sitting": 6,
-        "standing": 7,
-        "walking": 8,
+        "climbingdown": 'climbing_down',
+        "climbingup": 'climbing_up',
+        "jumping": 'jumping',
+        "lying": 'lying',
+        "running": 'running',
+        "sitting": 'sitting',
+        "standing": 'standing',
+        "walking": 'walking',
     }
 
     RWHAR_BAND_LOCATION = {
@@ -244,6 +268,7 @@ def create_rwhar_dataset(folder):
                 activity_name = "_" + activity + "_csv.zip"
                 path_acc = filepath + '/' + sub + "/acc" + activity_name  # concat the path to acc file for given activity and subject
                 table = rwhar_load_table_activity(path_acc)
+
                 table["activity"] = RWHAR_ACTIVITY_NUM[activity]  # add a activity column and fill it with activity num
                 sub_pd = sub_pd.append(table)
 
@@ -265,6 +290,7 @@ def create_rwhar_dataset(folder):
 
     data = clean_rwhar(folder, sel_location='forearm')
     data = data[['subject', 'acc_x', 'acc_y', 'acc_z', 'activity']]
+    data = data.astype({'subject': int, 'acc_x': float, 'acc_y': float, 'acc_z': float, 'activity': str})
     return data
 
 
@@ -281,35 +307,35 @@ def create_opportunity_dataset(folder, output_folder):
     NB_SENSOR_CHANNELS = 113
 
     # Hardcoded names of the files defining the OPPORTUNITY challenge data. As named in the original data.
-    OPPORTUNITY_DATA_FILES = [# Ordonez training
-                              (0, 'OpportunityUCIDataset/dataset/S1-Drill.dat'),
-                              (0, 'OpportunityUCIDataset/dataset/S1-ADL1.dat'),
-                              (0, 'OpportunityUCIDataset/dataset/S1-ADL2.dat'),
-                              (0, 'OpportunityUCIDataset/dataset/S1-ADL3.dat'),
-                              (0, 'OpportunityUCIDataset/dataset/S1-ADL4.dat'),
-                              (0, 'OpportunityUCIDataset/dataset/S1-ADL5.dat'),
-                              (1, 'OpportunityUCIDataset/dataset/S2-Drill.dat'),
-                              (1, 'OpportunityUCIDataset/dataset/S2-ADL1.dat'),
-                              (1, 'OpportunityUCIDataset/dataset/S2-ADL2.dat'),
-                              (2, 'OpportunityUCIDataset/dataset/S3-Drill.dat'),
-                              (2, 'OpportunityUCIDataset/dataset/S3-ADL1.dat'),
-                              (2, 'OpportunityUCIDataset/dataset/S3-ADL2.dat'),
-                              # Ordonez validation
-                              (1, 'OpportunityUCIDataset/dataset/S2-ADL3.dat'),
-                              (2, 'OpportunityUCIDataset/dataset/S3-ADL3.dat'),
-                              # Ordonez testing
-                              (1, 'OpportunityUCIDataset/dataset/S2-ADL4.dat'),
-                              (1, 'OpportunityUCIDataset/dataset/S2-ADL5.dat'),
-                              (2, 'OpportunityUCIDataset/dataset/S3-ADL4.dat'),
-                              (2, 'OpportunityUCIDataset/dataset/S3-ADL5.dat'),
-                              # additional data
-                              (3, 'OpportunityUCIDataset/dataset/S4-ADL1.dat'),
-                              (3, 'OpportunityUCIDataset/dataset/S4-ADL2.dat'),
-                              (3, 'OpportunityUCIDataset/dataset/S4-ADL3.dat'),
-                              (3, 'OpportunityUCIDataset/dataset/S4-ADL4.dat'),
-                              (3, 'OpportunityUCIDataset/dataset/S4-ADL5.dat'),
-                              (3, 'OpportunityUCIDataset/dataset/S4-Drill.dat')
-                              ]
+    OPPORTUNITY_DATA_FILES = [  # Ordonez training
+        (0, 'OpportunityUCIDataset/dataset/S1-Drill.dat'),
+        (0, 'OpportunityUCIDataset/dataset/S1-ADL1.dat'),
+        (0, 'OpportunityUCIDataset/dataset/S1-ADL2.dat'),
+        (0, 'OpportunityUCIDataset/dataset/S1-ADL3.dat'),
+        (0, 'OpportunityUCIDataset/dataset/S1-ADL4.dat'),
+        (0, 'OpportunityUCIDataset/dataset/S1-ADL5.dat'),
+        (1, 'OpportunityUCIDataset/dataset/S2-Drill.dat'),
+        (1, 'OpportunityUCIDataset/dataset/S2-ADL1.dat'),
+        (1, 'OpportunityUCIDataset/dataset/S2-ADL2.dat'),
+        (2, 'OpportunityUCIDataset/dataset/S3-Drill.dat'),
+        (2, 'OpportunityUCIDataset/dataset/S3-ADL1.dat'),
+        (2, 'OpportunityUCIDataset/dataset/S3-ADL2.dat'),
+        # Ordonez validation
+        (1, 'OpportunityUCIDataset/dataset/S2-ADL3.dat'),
+        (2, 'OpportunityUCIDataset/dataset/S3-ADL3.dat'),
+        # Ordonez testing
+        (1, 'OpportunityUCIDataset/dataset/S2-ADL4.dat'),
+        (1, 'OpportunityUCIDataset/dataset/S2-ADL5.dat'),
+        (2, 'OpportunityUCIDataset/dataset/S3-ADL4.dat'),
+        (2, 'OpportunityUCIDataset/dataset/S3-ADL5.dat'),
+        # additional data
+        (3, 'OpportunityUCIDataset/dataset/S4-ADL1.dat'),
+        (3, 'OpportunityUCIDataset/dataset/S4-ADL2.dat'),
+        (3, 'OpportunityUCIDataset/dataset/S4-ADL3.dat'),
+        (3, 'OpportunityUCIDataset/dataset/S4-ADL4.dat'),
+        (3, 'OpportunityUCIDataset/dataset/S4-ADL5.dat'),
+        (3, 'OpportunityUCIDataset/dataset/S4-Drill.dat')
+    ]
 
     # Hardcoded thresholds to define global maximums and minimums for every one of the 113 sensor channels employed in the
     # OPPORTUNITY challenge
@@ -388,28 +414,30 @@ def create_opportunity_dataset(folder, output_folder):
         :return: numpy integer array
             Modified sensor labels
         """
-
+        data_y[data_y == 0] = 'null_class'
         if label == 'locomotion':  # Labels for locomotion are adjusted
-            data_y[data_y == 4] = 3
-            data_y[data_y == 5] = 4
+            data_y[data_y == 1] = 'stand'
+            data_y[data_y == 2] = 'walk'
+            data_y[data_y == 4] = 'sit'
+            data_y[data_y == 5] = 'lie'
         elif label == 'gestures':  # Labels for gestures are adjusted
-            data_y[data_y == 406516] = 1
-            data_y[data_y == 406517] = 2
-            data_y[data_y == 404516] = 3
-            data_y[data_y == 404517] = 4
-            data_y[data_y == 406520] = 5
-            data_y[data_y == 404520] = 6
-            data_y[data_y == 406505] = 7
-            data_y[data_y == 404505] = 8
-            data_y[data_y == 406519] = 9
-            data_y[data_y == 404519] = 10
-            data_y[data_y == 406511] = 11
-            data_y[data_y == 404511] = 12
-            data_y[data_y == 406508] = 13
-            data_y[data_y == 404508] = 14
-            data_y[data_y == 408512] = 15
-            data_y[data_y == 407521] = 16
-            data_y[data_y == 405506] = 17
+            data_y[data_y == 406516] = 'open_door_1'
+            data_y[data_y == 406517] = 'open_door_2'
+            data_y[data_y == 404516] = 'close_door_1'
+            data_y[data_y == 404517] = 'close_door_2'
+            data_y[data_y == 406520] = 'open_fridge'
+            data_y[data_y == 404520] = 'close_fridge'
+            data_y[data_y == 406505] = 'open_dishwasher'
+            data_y[data_y == 404505] = 'close_dishwasher'
+            data_y[data_y == 406519] = 'open_drawer_1'
+            data_y[data_y == 404519] = 'close_drawer_1'
+            data_y[data_y == 406511] = 'open_drawer_2'
+            data_y[data_y == 404511] = 'close_drawer_2'
+            data_y[data_y == 406508] = 'open_drawer_3'
+            data_y[data_y == 404508] = 'close_drawer_3'
+            data_y[data_y == 408512] = 'clean_table'
+            data_y[data_y == 407521] = 'drink_from_cup'
+            data_y[data_y == 405506] = 'toggle_switch'
         return data_y
 
     def process_dataset_file(data):
@@ -423,9 +451,6 @@ def create_opportunity_dataset(folder, output_folder):
         # Select correct columns
         data = select_columns_opp(data)
         data = data[:, 1:]
-        # adjust labels to be counting from 1
-        data[:, 113] = adjust_idx_labels(data[:, 113], 'locomotion').astype(int)
-        data[:, 114] = adjust_idx_labels(data[:, 114], 'gestures').astype(int)
 
         # Perform linear interpolation
         data[:, :113] = np.array([pd.Series(i).interpolate() for i in data[:, :113].T]).T
@@ -445,7 +470,7 @@ def create_opportunity_dataset(folder, output_folder):
         :param target_filename: string
             Processed file
         """
-        full = np.empty((0, NB_SENSOR_CHANNELS+3))
+        full = np.empty((0, NB_SENSOR_CHANNELS + 3))
 
         zf = zipfile.ZipFile(dataset)
         print('Processing dataset files ...')
@@ -466,27 +491,35 @@ def create_opportunity_dataset(folder, output_folder):
 
         print("Final dataset with size: {0} ".format(full.shape))
         # write full dataset
-        pd.DataFrame(full, index=None).to_csv(os.path.join(target_filename + '_data.csv'), index=False, header=False)
+        full_data = pd.DataFrame(full, index=None)
+        full_data = full_data.astype({0: int})
+        # adjust labels to be counting from 1
+        full_data[114] = adjust_idx_labels(full_data[114], 'locomotion')
+        full_data[115] = adjust_idx_labels(full_data[115], 'gestures')
+
+        full_data.to_csv(target_filename + '_data.csv', index=False, header=False)
         # write Ordonez split
-        pd.DataFrame(full[:nb_test_samples, :], index=None).to_csv(target_filename + '_ordonez_data.csv', index=False, header=False)
+        full_data.iloc[:nb_test_samples, :].to_csv(target_filename + '_ordonez_data.csv', index=False, header=False)
 
     generate_data(os.path.join(folder, 'OpportunityUCIDataset.zip'), output_folder)
 
 
 if __name__ == '__main__':
     # opportunity
-    create_opportunity_dataset('../data/raw/opportunity', '../data/opportunity')
+    #create_opportunity_dataset('../data/raw/opportunity', '../data/opportunity')
     # wetlab
-    feat = lambda streams: [s for s in streams if s.type == "audio"]
-    label = lambda streams: [s for s in streams if s.type == "subtitle"]
-    create_wetlab_data_from_mkvs(feat, label, '../data/raw/wetlab', 50).to_csv(
-        '../data/wetlab_data.csv', index=False, header=False)
+    #feat = lambda streams: [s for s in streams if s.type == "audio"]
+    #label = lambda streams: [s for s in streams if s.type == "subtitle"]
+    #create_wetlab_data_from_mkvs(feat, label, '../data/raw/wetlab', 50).to_csv(
+    #    '../data/wetlab_data.csv', index=False, header=False)
+
     # sbhar
-    create_sbhar_dataset('../data/raw/sbhar').to_csv(
-        '../data/sbhar_data.csv', index=False, header=False)
+    #create_sbhar_dataset('../data/raw/sbhar').to_csv(
+    #   '../data/sbhar_data.csv', index=False, header=False)
+
     # hhar
     create_hhar_dataset('../data/raw/hhar').to_csv(
-        '../data/hhar_data.csv', index=False, header=False)
+       '../data/hhar_data.csv', index=False, header=False)
     # rwhar
-    create_rwhar_dataset('../data/raw/rwhar').to_csv(
-        '../data/rwhar_data.csv', index=False, header=False)
+    #create_rwhar_dataset('../data/raw/rwhar').to_csv(
+    #   '../data/rwhar_data.csv', index=False, header=False)
