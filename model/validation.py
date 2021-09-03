@@ -236,7 +236,7 @@ def per_participant_cv(data, args, log_date, log_timestamp):
     return net
 
 
-def normal_cv(X_train, y_train, X_val, y_val, X_test, y_test, args, log_date, log_timestamp):
+def train_valid_test_split(X_train, y_train, X_val, y_val, X_test, y_test, args, log_date, log_timestamp):
     """
     Method to apply normal cross-validation, i.e. one set split into train, validation and testing data.
 

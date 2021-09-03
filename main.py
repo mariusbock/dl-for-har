@@ -7,7 +7,7 @@ import pickle
 
 from data_processing.preprocess_data import load_dataset, compute_mean_and_std
 from misc.osutils import mkdir_if_missing
-from model.cross_validation import cross_participant_cv, per_participant_cv, normal_cv
+from model.validation import cross_participant_cv, per_participant_cv, train_valid_test_split
 
 from misc.logging import Logger
 from misc.torchutils import seed_torch
@@ -82,7 +82,7 @@ REDUCE_LAYER_OUTPUT = 8
 """
 TRAINING OPTIONS:
 - SEED: random seed which is to be employed
-- VALID_TYPE: (cross-)validation type; either 'cross-participant', 'per-participant' or 'normal'
+- VALID_TYPE: (cross-)validation type; either 'cross-participant', 'per-participant' or 'train_valid_test'
 - BATCH_SIZE: size of the batches
 - EPOCHS: number of epochs during training
 - OPTIMIZER: optimizer to use; either 'rmsprop', 'adadelta' or 'adam'
@@ -100,7 +100,7 @@ TRAINING OPTIONS:
 """
 
 SEED = 1
-VALID_TYPE = 'cross-participant'
+VALID_TYPE = 'train-valid-test'
 BATCH_SIZE = 100
 EPOCHS = 30
 OPTIMIZER = 'adam'
@@ -165,8 +165,8 @@ def main(args):
     print('Loading data...')
     X_train, y_train, X_val, y_val, X_test, y_test, nb_classes, class_names, sampling_rate, has_null = \
         load_dataset(dataset=args.dataset,
-                     cutoff_train=args.cutoff_train,
-                     cutoff_valid=args.cutoff_valid,
+                     cutoff_train=args.cutoff_train - 1,
+                     cutoff_valid=args.cutoff_valid - 1,
                      pred_type=args.pred_type,
                      include_null=args.include_null
                      )
@@ -203,8 +203,8 @@ def main(args):
         trained_net = cross_participant_cv(data, args, log_date, log_timestamp)
     elif args.valid_type == 'per-participant':
         trained_net = per_participant_cv(data, args, log_date, log_timestamp)
-    elif args.valid_type == 'normal':
-        trained_net = normal_cv(X_train, y_train, X_val, y_val, X_test, y_test, args, log_date, log_timestamp)
+    elif args.valid_type == 'train-valid-test':
+        trained_net = train_valid_test_split(X_train, y_train, X_val, y_val, X_test, y_test, args, log_date, log_timestamp)
 
     # if selected, save model as pickle file
     if args.save_model:
