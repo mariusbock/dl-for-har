@@ -54,7 +54,10 @@ Results were obtained on the Wetlab [[4]](#4), RWHAR [[6]](#6), SBHAR [[2]](#2) 
 
 ## Datasets
 
-The datasets (raw and preprocessed data) used during experiments can be either downloaded via this link: https://uni-siegen.sciebo.de/s/sMWQ2vJhDzM6sil
+The datasets (raw and preprocessed data) used during experiments can be either downloaded via this link: 
+
+Only processed dataset: https://uni-siegen.sciebo.de/s/sMWQ2vJhDzM6sil
+Processed + raw data: https://uni-siegen.sciebo.de/s/WJeddtW3bTGpiSb
 
 PW: iswc21
 
