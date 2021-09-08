@@ -2,12 +2,11 @@ import os
 
 import pandas as pd
 import numpy as np
-import pickle as cp
 
 pd.options.mode.chained_assignment = None
 
 
-def load_dataset(dataset, cutoff_train, cutoff_valid, pred_type='actions', include_null=False):
+def load_dataset(dataset, pred_type='actions', include_null=False):
     if dataset == 'wetlab':
         if pred_type == 'actions':
             class_names = ['cutting', 'inverting', 'peeling', 'pestling', 'pipetting', 'pouring', 'stirring',
@@ -45,38 +44,28 @@ def load_dataset(dataset, cutoff_train, cutoff_valid, pred_type='actions', inclu
             class_names = ['stand', 'walk', 'sit', 'lie']
 
     data = pd.read_csv(os.path.join('data/', dataset + '_data.csv'), sep=',', header=None, index_col=None)
-    X_train, y_train, X_val, y_val, X_test, y_test = \
-        preprocess_data(data, dataset, cutoff_train, cutoff_valid, pred_type, has_null, include_null)
+    X, y = preprocess_data(data, dataset, pred_type, has_null, include_null)
 
     print(" ..from file {}".format(os.path.join('data/', dataset + '_data.csv')))
-    print(" ..reading instances: train {0}, val {1}, test {2}".format(X_train.shape, X_val.shape, X_test.shape))
 
-    X_train = X_train.astype(np.float32)
-    X_val = X_val.astype(np.float32)
-    X_test = X_test.astype(np.float32)
+    X = X.astype(np.float32)
 
     # The targets are casted to int8 for GPU compatibility.
-    y_train = y_train.astype(np.uint8)
-    y_val = y_val.astype(np.uint8)
-    y_test = y_test.astype(np.uint8)
+    y = y.astype(np.uint8)
 
     if has_null and include_null:
         class_names = ['null'] + class_names
 
-    return X_train, y_train, X_val, y_val, X_test, y_test, len(class_names), class_names, sampling_rate, has_null
+    return X, y, len(class_names), class_names, sampling_rate, has_null
 
 
-def preprocess_data(data, ds, cot, cov, pt='actions', has_null=False, include_null=True):
+def preprocess_data(data, ds, pt='actions', has_null=False, include_null=True):
     """
     Function to preprocess the wetlab dataset according to settings.
     :param data: pandas dataframe
         Dataframe containing all data
     :param ds: string
         Name of dataset
-    :param cot: integer
-        Subject number up to which to contain in the training dataset
-    :param cov: integer
-        Subject number up to which to contain in the validation dataset. All other sequences will be test.
     :param pt: string, ['actions' (default), 'tasks']
         Type of labels that are to be used
     :param has_null: boolean, default: True
@@ -88,66 +77,31 @@ def preprocess_data(data, ds, cot, cov, pt='actions', has_null=False, include_nu
     """
 
     print('Processing dataset files ...')
-    if ds == 'opportunity_ordonez':
-        train = data.iloc[:497014, :]
-        val = data.iloc[497014:557963, :]
-        test = data.iloc[557963:, :]
-
     if has_null:
         if include_null:
-            if ds == 'opportunity_ordonez':
-                pass
-            else:
-                train = data[(data.iloc[:, 0] <= cot)]
-                val = data[(data.iloc[:, 0] <= cov) & (data.iloc[:, 0] > cot)]
-                test = data[(data.iloc[:, 0] > cov)]
+            pass
         else:
             if (ds == 'wetlab' and pt == 'actions') or (ds == 'opportunity' and pt == 'locomotion'):
-                train = data[(data.iloc[:, 0] <= cot) & (data.iloc[:, -2] != 'null_class')]
-                val = data[(data.iloc[:, 0] <= cov) & (data.iloc[:, 0] > cot) & (data.iloc[:, -2] != 'null_class')]
-                test = data[(data.iloc[:, 0] > cov) & (data.iloc[:, -2] != 'null_class')]
-            elif ds == 'opportunity_ordonez' and pt == 'locomotion':
-                train = train[train.iloc[:, -2] != 'null_class']
-                val = val[data.iloc[:, -2] != 'null_class']
-                test = test[data.iloc[:, -2] != 'null_class']
-            elif ds == 'opportunity_ordonez' and pt == 'gestures':
-                train = train[train.iloc[:, -1] != 'null_class']
-                val = val[data.iloc[:, -1] != 'null_class']
-                test = test[data.iloc[:, -1] != 'null_class']
+                data = data[(data.iloc[:, -2] != 'null_class')]
+            elif ds == 'opportunity_ordonez':
+                pass
             else:
-                train = data[(data.iloc[:, 0] <= cot) & (data.iloc[:, -1] != 'null_class')]
-                val = data[(data.iloc[:, 0] <= cov) & (data.iloc[:, 0] > cot) & (data.iloc[:, -1] != 'null_class')]
-                test = data[(data.iloc[:, 0] > cov) & (data.iloc[:, -1] != 'null_class')]
-    else:
-        train = data[(data.iloc[:, 0] <= cot)]
-        val = data[(data.iloc[:, 0] <= cov) & (data.iloc[:, 0] > cot)]
-        test = data[(data.iloc[:, 0] > cov)]
+                data = data[(data.iloc[:, -1] != 'null_class')]
 
     if (ds == 'wetlab' and pt == 'actions') or ((ds == 'opportunity' or ds == 'opportunity_ordonez') and pt == "locomotion"):
-        X_train, X_val, X_test = train.iloc[:, :-2], val.iloc[:, :-2], test.iloc[:, :-2]
-        y_train = adjust_labels(train.iloc[:, -2], ds, pt).astype(int)
-        y_val = adjust_labels(val.iloc[:, -2], ds, pt).astype(int)
-        y_test = adjust_labels(test.iloc[:, -2], ds, pt).astype(int)
+        X, y = data.iloc[:, :-2], adjust_labels(data.iloc[:, -2], ds, pt).astype(int)
     elif (ds == 'wetlab' and pt == 'tasks') or ((ds == 'opportunity' or ds == 'opportunity_ordonez') and pt == "gestures"):
-        X_train, X_val, X_test = train.iloc[:, :-2], val.iloc[:, :-2], test.iloc[:, :-2]
-        y_train = adjust_labels(train.iloc[:, -1], ds, pt).astype(int)
-        y_val = adjust_labels(val.iloc[:, -1], ds, pt).astype(int)
-        y_test = adjust_labels(test.iloc[:, -1], ds, pt).astype(int)
+        X, y = data.iloc[:, :-2], adjust_labels(data.iloc[:, -1], ds, pt).astype(int)
     else:
-        X_train, X_val, X_test = train.iloc[:, :-1], val.iloc[:, :-1], test.iloc[:, :-1]
-        y_train = adjust_labels(train.iloc[:, -1], ds, pt).astype(int)
-        y_val = adjust_labels(val.iloc[:, -1], ds, pt).astype(int)
-        y_test = adjust_labels(test.iloc[:, -1], ds, pt).astype(int)
+        X, y = data.iloc[:, :-1], adjust_labels(data.iloc[:, -1], ds, pt).astype(int)
 
     # if no null class in dataset subtract one from all labels
     if has_null and not include_null:
-        y_train -= 1
-        y_val -= 1
-        y_test -= 1
+        y -= 1
 
-    print("Final datasets with size: | train {0} | val {1} | test {2} | ".format(X_train.shape, X_val.shape, X_test.shape))
+    print("Full dataset with size: | X {0} | y {1} | ".format(X.shape, y.shape))
 
-    return X_train.to_numpy(), y_train.to_numpy(), X_val.to_numpy(), y_val.to_numpy(), X_test.to_numpy(), y_test.to_numpy()
+    return X, y
 
 
 def compute_mean_and_std(data):

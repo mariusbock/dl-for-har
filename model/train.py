@@ -152,8 +152,7 @@ def init_optimizer_and_loss(network, optimizer, loss, lr, weight_decay, class_we
     return opt, criterion
 
 
-def train(train_features, train_labels, val_features, val_labels, test_features, test_labels, network, config,
-          log_date, log_timestamp):
+def train(train_features, train_labels, val_features, val_labels, network, config, log_date, log_timestamp):
     """
     Method to train a PyTorch network.
 
@@ -161,8 +160,6 @@ def train(train_features, train_labels, val_features, val_labels, test_features,
     :param train_labels: training labels
     :param val_features: validation features
     :param val_labels: validation labels
-    :param test_features: test features (if used)
-    :param test_labels: test labels (if used)
     :param network: DeepConvLSTM network object
     :param config: config file which contains all training and hyperparameter settings
     :param log_date: date used for logging
@@ -383,52 +380,69 @@ def train(train_features, train_labels, val_features, val_labels, test_features,
         if early_stop:
             break
 
-    """
-    TESTING
-    """
-    # if test set not empty
-    if test_features.size != 0 and config['valid_type'] == 'normal':
-        # set network to eval mode
-        network.eval()
-
-        # helper objects
-        test_preds = []
-        test_gt = []
-
-        # initialize test dataset and loader
-        dataset = torch.utils.data.TensorDataset(torch.from_numpy(test_features).float(), torch.from_numpy(test_labels))
-        testloader = DataLoader(dataset,
-                                batch_size=config['batch_size'],
-                                num_workers=2,
-                                shuffle=False,
-                                )
-
-        with torch.no_grad():
-            # iterate over test dataset
-            for i, (x, y) in enumerate(testloader):
-                # send x and y to GPU
-                inputs, targets = x.to(config['gpu']), y.to(config['gpu'])
-
-                # send inputs through network to get predictions and calculate softmax probabilities
-                test_output = network(inputs)
-                test_output = torch.nn.functional.softmax(test_output, dim=1)
-
-                # create predictions and append them to final list
-                y_preds = np.argmax(test_output.cpu().numpy(), axis=-1)
-                y_true = targets.cpu().numpy().flatten()
-                test_preds = np.concatenate((np.array(test_preds, int), np.array(y_preds, int)))
-                test_gt = np.concatenate((np.array(test_gt, int), np.array(y_true, int)))
-
-            # create test output
-            test_output = np.vstack((test_preds, test_gt)).T
-    else:
-        # if test set empty create empty test output
-        test_output = None
-
     # if plot_gradient gradient plot is shown at end of training
     if config['save_gradient_plot']:
         mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
         plt.savefig(os.path.join('logs', log_date, log_timestamp, 'grad_flow.png'))
 
     # return validation, train and test predictions as numpy array with ground truth
-    return best_network, np.vstack((best_val_preds, val_gt)).T, np.vstack((best_train_preds, train_gt)).T, test_output
+    return best_network, np.vstack((best_val_preds, val_gt)).T, np.vstack((best_train_preds, train_gt)).T
+
+
+def predict(test_features, test_labels, network, config, log_date, log_timestamp):
+    """
+    Method that applies a trained network to obtain predictions on a test dataset. If selected, saves predictions.
+
+    :param test_features: test features
+    :param test_labels: test labels
+    :param network: trained network object
+    :param config: config file which contains all training and hyperparameter settings
+    :param log_date: date used for saving predictions
+    :param log_timestamp: timestamp used for saving predictions
+    """
+    # set network to eval mode
+    network.eval()
+    # helper objects
+    test_preds = []
+    test_gt = []
+
+    # initialize test dataset and loader
+    dataset = torch.utils.data.TensorDataset(torch.from_numpy(test_features).float(), torch.from_numpy(test_labels))
+    testloader = DataLoader(dataset,
+                            batch_size=config['batch_size'],
+                            num_workers=2,
+                            shuffle=False,
+                            )
+
+    with torch.no_grad():
+        # iterate over test dataset
+        for i, (x, y) in enumerate(testloader):
+            # send x and y to GPU
+            inputs, targets = x.to(config['gpu']), y.to(config['gpu'])
+
+            # send inputs through network to get predictions and calculate softmax probabilities
+            test_output = network(inputs)
+            test_output = torch.nn.functional.softmax(test_output, dim=1)
+
+            # create predictions and append them to final list
+            y_preds = np.argmax(test_output.cpu().numpy(), axis=-1)
+            y_true = targets.cpu().numpy().flatten()
+            test_preds = np.concatenate((np.array(test_preds, int), np.array(y_preds, int)))
+            test_gt = np.concatenate((np.array(test_gt, int), np.array(y_true, int)))
+
+    cls = np.array(range(config['nb_classes']))
+    print('\nTEST RESULTS: ')
+    print("Avg. Accuracy: {0}".format(jaccard_score(test_gt, test_preds, average='macro')))
+    print("Avg. Precision: {0}".format(precision_score(test_gt, test_preds, average='macro')))
+    print("Avg. Recall: {0}".format(recall_score(test_gt, test_preds, average='macro')))
+    print("Avg. F1: {0}".format(f1_score(test_gt, test_preds, average='macro')))
+
+    print("\nTEST RESULTS (PER CLASS): ")
+    print("Accuracy: {0}".format(jaccard_score(test_gt, test_preds, average=None, labels=cls)))
+    print("Precision: {0}".format(precision_score(test_gt, test_preds, average=None, labels=cls)))
+    print("Recall: {0}".format(recall_score(test_gt, test_preds, average=None, labels=cls)))
+    print("F1: {0}".format(f1_score(test_gt, test_preds, average=None, labels=cls)))
+
+    if config['save_test_preds']:
+        mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
+        np.save(os.path.join('logs', log_date, log_timestamp, 'test_preds.npy'), test_output)

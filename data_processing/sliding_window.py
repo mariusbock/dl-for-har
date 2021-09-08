@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 
 def sliding_window_seconds(data, length_in_seconds=1, sampling_rate=50, overlap_ratio=None):
@@ -62,7 +63,7 @@ def sliding_window_samples(data, samples_per_window, overlap_ratio):
     return result_windows, result_indices
 
 
-def apply_sliding_window(dataset, data_x, data_y, sliding_window_size, unit, sampling_rate, sliding_window_overlap):
+def apply_sliding_window(data_x, data_y, sliding_window_size, unit, sampling_rate, sliding_window_overlap):
     """
     Function which transforms a dataset into windows of a specific size and overlap.
 
@@ -83,30 +84,21 @@ def apply_sliding_window(dataset, data_x, data_y, sliding_window_size, unit, sam
     full_data = np.concatenate((data_x, data_y[:, None]), axis=1)
     output_x = None
     output_y = None
-    if dataset == 'opportunity_ordonez':
+
+    for i, subject in enumerate(np.unique(full_data[:, 0])):
+        subject_data = full_data[full_data[:, 0] == subject]
+        subject_x, subject_y = subject_data[:, :-1], subject_data[:, -1]
         if unit == 'units':
-            tmp_x, _ = sliding_window_samples(data_x, sliding_window_size, sliding_window_overlap)
-            tmp_y, _ = sliding_window_samples(data_y, sliding_window_size, sliding_window_overlap)
+            tmp_x, _ = sliding_window_samples(subject_x, sliding_window_size, sliding_window_overlap)
+            tmp_y, _ = sliding_window_samples(subject_y, sliding_window_size, sliding_window_overlap)
         elif unit == 'seconds':
-            tmp_x, _ = sliding_window_seconds(data_x, sliding_window_size, sampling_rate, sliding_window_overlap)
-            tmp_y, _ = sliding_window_seconds(data_y, sliding_window_size, sampling_rate, sliding_window_overlap)
-        output_x = tmp_x
-        output_y = tmp_y
-    else:
-        for i, subject in enumerate(np.unique(full_data[:, 0])):
-            subject_data = full_data[full_data[:, 0] == subject]
-            subject_x, subject_y = subject_data[:, 1:-1], subject_data[:, -1]
-            if unit == 'units':
-                tmp_x, _ = sliding_window_samples(subject_x, sliding_window_size, sliding_window_overlap)
-                tmp_y, _ = sliding_window_samples(subject_y, sliding_window_size, sliding_window_overlap)
-            elif unit == 'seconds':
-                tmp_x, _ = sliding_window_seconds(subject_x, sliding_window_size, sampling_rate, sliding_window_overlap)
-                tmp_y, _ = sliding_window_seconds(subject_y, sliding_window_size, sampling_rate, sliding_window_overlap)
-            if output_x is None:
-                output_x = tmp_x
-                output_y = tmp_y
-            else:
-                output_x = np.concatenate((output_x, tmp_x), axis=0)
-                output_y = np.concatenate((output_y, tmp_y), axis=0)
+            tmp_x, _ = sliding_window_seconds(subject_x, sliding_window_size, sampling_rate, sliding_window_overlap)
+            tmp_y, _ = sliding_window_seconds(subject_y, sliding_window_size, sampling_rate, sliding_window_overlap)
+        if output_x is None:
+            output_x = tmp_x
+            output_y = tmp_y
+        else:
+            output_x = np.concatenate((output_x, tmp_x), axis=0)
+            output_y = np.concatenate((output_y, tmp_y), axis=0)
     output_y = [[i[-1]] for i in output_y]
     return output_x, np.array(output_y).flatten()

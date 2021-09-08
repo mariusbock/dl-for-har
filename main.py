@@ -5,9 +5,13 @@ import sys
 import numpy as np
 import pickle
 
+from sklearn.model_selection import train_test_split
+
 from data_processing.preprocess_data import load_dataset, compute_mean_and_std
+from data_processing.sliding_window import apply_sliding_window
 from misc.osutils import mkdir_if_missing
-from model.validation import cross_participant_cv, per_participant_cv, train_valid_test_split
+from model.validation import cross_participant_cv, per_participant_cv, train_valid_split, k_fold
+from model.train import predict
 
 from misc.logging import Logger
 from misc.torchutils import seed_torch
@@ -25,19 +29,27 @@ DATASET OPTIONS:
 - PRED_TYPE:
     - Opportunity: 'gestures' or 'locomotion'
     - Wetlab: 'actions' or 'tasks'
-- CUTOFF_TRAIN: subject where the train dataset is cut off, i.e. last subject within train dataset
-- CUTOFF_VALID: subject where the validation dataset is cut off, i.e. last subject within validation dataset
+- CUTOFF_TYPE: type how dataset is supposed to be split (subject-wise, percentage or record)
+- CUTOFF_TRAIN: point where the train dataset is cut off; depends on CUTOFF_TYPE:
+    - subject-wise: last subject which is supposed to be contained in train dataset, i.e. 5 = first 5 subjects are in train
+    - percentage: percentage value of how large the train dataset is supposed to be compared to full dataset
+    - record: last record which is supposed to be contained in train dataset, i.e. 500 = first 500 records are in train
+- CUTOFF_VALID: point where the validation dataset is cut off; depends on CUTOFF_TYPE:
+    - subject-wise: last subject which is supposed to be contained in validation dataset, i.e. 5 = first 5 subjects are in validation
+    - percentage: percentage value of how large the validation dataset is supposed to be compared to full dataset
+    - record: last record which is supposed to be contained in validation dataset, i.e. 500 = first 500 records are in validation
 - SW_LENGTH: length of sliding window
 - SW_UNIT: unit in which length of sliding window is measured
 - SW_OVERLAP: overlap ratio between sliding windows (in percent, i.e. 60 = 60%)
 - MEANS_AND_STDS: boolean whether to append means and standard deviations of feature columns to dataset
-- INCLUDE_NULL: boolean whether to include null class in datasets
+- INCLUDE_NULL: boolean whether to include null class in datasets (does not work with opportunity_ordonez dataset)
 """
 
 DATASET = 'hhar'
-PRED_TYPE = 'tasks'
-CUTOFF_TRAIN = 2
-CUTOFF_VALID = 30
+PRED_TYPE = 'gestures'
+CUTOFF_TYPE = 'subject'
+CUTOFF_TRAIN = 3
+CUTOFF_VALID = 5
 SW_LENGTH = 24
 SW_UNIT = 'units'
 SW_OVERLAP = 50
@@ -82,7 +94,7 @@ REDUCE_LAYER_OUTPUT = 8
 """
 TRAINING OPTIONS:
 - SEED: random seed which is to be employed
-- VALID_TYPE: (cross-)validation type; either 'cross-participant', 'per-participant' or 'train_valid_test'
+- VALID_TYPE: (cross-)validation type; either 'cross-participant', 'per-participant', 'train-valid-split' or 'k-fold'
 - BATCH_SIZE: size of the batches
 - EPOCHS: number of epochs during training
 - OPTIMIZER: optimizer to use; either 'rmsprop', 'adadelta' or 'adam'
@@ -91,6 +103,7 @@ TRAINING OPTIONS:
 - WEIGHTS_INIT: weight initialization method to use to initialize network
 - LOSS: loss to use; currently only 'cross_entropy' supported
 - GPU: name of GPU to use (e.g. 'cuda:0')
+- SPLITS_KFOLD: number of splits for stratified k-fold cross-validation
 - SPLITS_SSS: number of stratified splits for each subject in per-participant evaluation
 - USE_WEIGHTS: boolean whether to use weighted loss calculation based on support of each class
 - ADJ_LR: boolean whether to adjust learning rate if no improvement
@@ -100,15 +113,16 @@ TRAINING OPTIONS:
 """
 
 SEED = 1
-VALID_TYPE = 'train-valid-test'
+VALID_TYPE = 'k-fold'
 BATCH_SIZE = 100
-EPOCHS = 30
+EPOCHS = 5
 OPTIMIZER = 'adam'
 LR = 1e-4
 WEIGHT_DECAY = 1e-6
 WEIGHTS_INIT = 'xavier_normal'
 LOSS = 'cross_entropy'
 GPU = 'cuda:0'
+SPLITS_KFOLD = 5
 SPLITS_SSS = 2
 SIZE_SSS = 0.6
 USE_WEIGHTS = True
@@ -163,48 +177,82 @@ def main(args):
     ################################################## DATA LOADING ####################################################
 
     print('Loading data...')
-    X_train, y_train, X_val, y_val, X_test, y_test, nb_classes, class_names, sampling_rate, has_null = \
+    X, y, nb_classes, class_names, sampling_rate, has_null = \
         load_dataset(dataset=args.dataset,
-                     cutoff_train=args.cutoff_train - 1,
-                     cutoff_valid=args.cutoff_valid - 1,
                      pred_type=args.pred_type,
                      include_null=args.include_null
                      )
+
     args.sampling_rate = sampling_rate
     args.nb_classes = nb_classes
     args.class_names = class_names
     args.has_null = has_null
 
-    if args.dataset == 'opportunity_ordonez':
-        args.valid_type = 'normal'
-
     # if selected compute means and standard deviations of each column and append to dataset
     if args.means_and_stds:
-        X_train = np.concatenate((X_train, compute_mean_and_std(X_train[:, 1:])), axis=1)
-        X_val = np.concatenate((X_val, compute_mean_and_std(X_val[:, 1:])), axis=1)
-        X_test = np.concatenate((X_test, compute_mean_and_std(X_test[:, 1:])), axis=1)
+        X = np.concatenate((X, compute_mean_and_std(X[:, 1:])), axis=1)
 
     ############################################# TRAINING #############################################################
 
     # apply the chosen random seed to all relevant parts
     seed_torch(args.seed)
 
-    # create full dataset for cross-participant and per-participant evaluation
-    if X_test.size != 0:
-        X = np.concatenate((X_train, X_val, X_test), axis=0)
-        y = np.concatenate((y_train, y_val, y_test), axis=0)
-    else:
-        X = np.concatenate((X_train, X_val), axis=0)
-        y = np.concatenate((y_train, y_val), axis=0)
+    # re-create full dataset for splitting purposes
     data = np.concatenate((X, (np.array(y)[:, None])), axis=1)
+
+    # split data according to settings
+    if args.dataset == 'opportunity_ordonez':
+        args.valid_type = 'train-valid-split'
+        train = data[:497014, :]
+        valid = data[497014:557963, :]
+        test = data[557963:, :]
+    elif args.cutoff_type == 'subject':
+        train = data[(data[:, 0] <= (args.cutoff_train - 1))]
+        valid = data[(data[:, 0] > (args.cutoff_train - 1)) & (data[:, 0] <= (args.cutoff_valid - 1))]
+        test = data[(data[:, 0] > (args.cutoff_valid - 1))]
+        train_val = np.concatenate((train, valid), axis=0)
+    elif args.cutoff_type == 'percentage':
+        X_train_val, X_test, y_train_val, y_test = train_test_split(X, y,
+                                                                    train_size=(args.cutoff_train + args.cutoff_valid),
+                                                                    shuffle=False)
+
+        X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val,
+                                                          train_size=args.cutoff_train / (args.cutoff_train + args.cutoff_valid),
+                                                          shuffle=False)
+
+        train = np.concatenate((X_train, (np.array(y_train)[:, None])), axis=1)
+        valid = np.concatenate((X_val, (np.array(y_val)[:, None])), axis=1)
+        test = np.concatenate((X_test, (np.array(y_test)[:, None])), axis=1)
+
+        train_val = np.concatenate((X_train_val, (np.array(y_train_val)[:, None])), axis=1)
+    elif args.cutoff_type == 'record':
+        train = data[:args.cutoff_train, :]
+        valid = data[args.cutoff_train:args.cutoff_valid, :]
+        test = data[args.cutoff_valid:, :]
+
+        train_val = np.concatenate((train, valid), axis=1)
+
+    print("Split datasets with size: | train {0} | valid {1} | test {2} |".format(train.shape, valid.shape, test.shape))
 
     # cross-validation; either cross-participant, per-participant or normal
     if args.valid_type == 'cross-participant':
-        trained_net = cross_participant_cv(data, args, log_date, log_timestamp)
+        trained_net = cross_participant_cv(train_val, args, log_date, log_timestamp)
     elif args.valid_type == 'per-participant':
-        trained_net = per_participant_cv(data, args, log_date, log_timestamp)
-    elif args.valid_type == 'train-valid-test':
-        trained_net = train_valid_test_split(X_train, y_train, X_val, y_val, X_test, y_test, args, log_date, log_timestamp)
+        trained_net = per_participant_cv(train_val, args, log_date, log_timestamp)
+    elif args.valid_type == 'train-valid-split':
+        trained_net = train_valid_split(train, valid, args, log_date, log_timestamp)
+    elif args.valid_type == 'k-fold':
+        trained_net = k_fold(train_val, args, log_date, log_timestamp)
+    else:
+        print('Did not choose a valid validation type dataset!')
+        exit()
+
+    # test predictions
+    if test.size != 0:
+        X_test, y_test = apply_sliding_window(test[:, :-1], test[:, -1],
+                                              args.sw_length, args.sw_unit, args.sampling_rate, args.sw_overlap)
+        X_test = X_test[:, :, 1:]
+        predict(X_test, y_test, trained_net, vars(args), log_date, log_timestamp)
 
     # if selected, save model as pickle file
     if args.save_model:
@@ -234,16 +282,18 @@ if __name__ == '__main__':
     parser.add_argument('--save_gradient_plot', default=SAVE_GRADIENT_PLOT, type=bool, help='save gradient flow plot')
     parser.add_argument('--include_null', default=INCLUDE_NULL, type=bool,
                         help='include null class (if dataset has one) in training/ prediction')
+    parser.add_argument('--cutoff_type', default=CUTOFF_TYPE, type=str, help='type how dataset is split (subject, percentage or record)')
     parser.add_argument('--cutoff_train', default=CUTOFF_TRAIN, type=int,
-                        help='cutoff point (subject-wise) for train dataset')
+                        help='cutoff point for train dataset. See documentation for further explanations.')
     parser.add_argument('--cutoff_valid', default=CUTOFF_VALID, type=int,
-                        help='cutoff point (subject-wise) for validation dataset')
+                        help='cutoff point for validation dataset. See documentation for further explanations.')
+    parser.add_argument('--splits_kfold', default=SPLITS_KFOLD, type=int, help='no. splits for k-fold cv')
     parser.add_argument('--splits_sss', default=SPLITS_SSS, type=int, help='no. splits for per-participant eval')
     parser.add_argument('--size_sss', default=SIZE_SSS, type=float,
                         help='size of validation set in per-participant eval')
     parser.add_argument('--network', default=NETWORK, type=str, help='network to be used (e.g. deepconvlstm)')
     parser.add_argument('--valid_type', default=VALID_TYPE, type=str,
-                        help='validation type to be used (per-participant, cross-participant, k-fold)')
+                        help='validation type to be used (per-participant, cross-participant, train-valid-split, k-fold)')
     parser.add_argument('--seed', default=SEED, type=int, help='seed to be employed')
     parser.add_argument('--epochs', default=EPOCHS, type=int, help='no. epochs to use during training')
     parser.add_argument('--batch_size', default=BATCH_SIZE, type=int, help='batch size to use during training')

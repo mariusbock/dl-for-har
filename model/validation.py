@@ -1,12 +1,10 @@
 import os
 
 import numpy as np
-import pandas as pd
 from sklearn.metrics import jaccard_score, precision_score, recall_score, f1_score
-from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import StratifiedShuffleSplit, StratifiedKFold
 
 from data_processing.sliding_window import apply_sliding_window
-from misc.osutils import mkdir_if_missing
 from model.DeepConvLSTM import DeepConvLSTM
 from model.evaluate import evaluate_participant_scores
 from model.train import train
@@ -24,7 +22,7 @@ def cross_participant_cv(data, args, log_date, log_timestamp):
     :return trained network
     """
 
-    print(' Calculating cross-participant scores using LOSO CV.')
+    print('\nCALCULATING CROSS-PARTICIPANT SCORES USING LOSO CV.\n')
     cp_scores = np.zeros((4, args.nb_classes, int(np.max(data[:, 0]) + 1)))
     train_val_gap = np.zeros((4, int(np.max(data[:, 0]) + 1)))
     all_eval_output = None
@@ -33,25 +31,25 @@ def cross_participant_cv(data, args, log_date, log_timestamp):
     for i, sbj in enumerate(np.unique(data[:, 0])):
         # for i, sbj in enumerate([0, 1]):
         print('\n VALIDATING FOR SUBJECT {0} OF {1}'.format(int(sbj) + 1, int(np.max(data[:, 0])) + 1))
-        train_data = data[data[:, 0] != sbj][:, :]
-        val_data = data[data[:, 0] == sbj][:, :]
+        train_data = data[data[:, 0] != sbj]
+        val_data = data[data[:, 0] == sbj]
         args.lr = orig_lr
         # Sensor data is segmented using a sliding window mechanism
-        X_train, y_train = apply_sliding_window(args.dataset, train_data[:, :-1], train_data[:, -1],
+        X_train, y_train = apply_sliding_window(train_data[:, :-1], train_data[:, -1],
                                                 sliding_window_size=args.sw_length,
                                                 unit=args.sw_unit,
                                                 sampling_rate=args.sampling_rate,
                                                 sliding_window_overlap=args.sw_overlap,
                                                 )
 
-        X_val, y_val = apply_sliding_window(args.dataset, val_data[:, :-1], val_data[:, -1],
+        X_val, y_val = apply_sliding_window(val_data[:, :-1], val_data[:, -1],
                                             sliding_window_size=args.sw_length,
                                             unit=args.sw_unit,
                                             sampling_rate=args.sampling_rate,
                                             sliding_window_overlap=args.sw_overlap,
                                             )
 
-        X_test, y_test = pd.DataFrame(), pd.DataFrame()
+        X_train, X_val = X_train[:, :, 1:], X_val[:, :, 1:]
 
         args.window_size = X_train.shape[1]
         args.nb_channels = X_train.shape[2]
@@ -61,9 +59,9 @@ def cross_participant_cv(data, args, log_date, log_timestamp):
         else:
             print("Did not provide a valid network name!")
 
-        net, val_output, train_output, _ = train(X_train, y_train, X_val, y_val, X_test, y_test,
-                                                 network=net, config=vars(args), log_date=log_date,
-                                                 log_timestamp=log_timestamp)
+        net, val_output, train_output = train(X_train, y_train, X_val, y_val,
+                                              network=net, config=vars(args), log_date=log_date,
+                                              log_timestamp=log_timestamp)
 
         if all_eval_output is None:
             all_eval_output = val_output
@@ -123,7 +121,7 @@ def per_participant_cv(data, args, log_date, log_timestamp):
     :return trained network
     """
 
-    print('Calculating per-participant scores using stratified random split.')
+    print('\nCALCULATING PER-PARTICIPANT SCORES USING STRATIFIED SHUFFLE SPLIT.\n')
     pp_scores = np.zeros((4, args.nb_classes, int(np.max(data[:, 0]) + 1)))
     all_eval_output = None
     train_val_gap = np.zeros((4, int(np.max(data[:, 0]) + 1)))
@@ -137,7 +135,16 @@ def per_participant_cv(data, args, log_date, log_timestamp):
                                      random_state=args.seed)
 
         subject_data = data[data[:, 0] == sbj]
-        X, y = subject_data[:, :-1], subject_data[:, -1]
+
+        # sensor data is segmented using a sliding window mechanism
+        X, y = apply_sliding_window(subject_data[:, :-1], subject_data[:, -1],
+                                    sliding_window_size=args.sw_length,
+                                    unit=args.sw_unit,
+                                    sampling_rate=args.sampling_rate,
+                                    sliding_window_overlap=args.sw_overlap,
+                                    )
+
+        X = X[:, :, 1:]
 
         classes = np.array(range(args.nb_classes))
         subject_accuracy = np.zeros(args.nb_classes)
@@ -156,23 +163,6 @@ def per_participant_cv(data, args, log_date, log_timestamp):
             y_train, y_val = y[train_index], y[test_index]
             args.lr = orig_lr
 
-            # Sensor data is segmented using a sliding window mechanism
-            X_train, y_train = apply_sliding_window(args.dataset, X_train, y_train,
-                                                    sliding_window_size=args.sw_length,
-                                                    unit=args.sw_unit,
-                                                    sampling_rate=args.sampling_rate,
-                                                    sliding_window_overlap=args.sw_overlap,
-                                                    )
-
-            X_val, y_val = apply_sliding_window(args.dataset, X_val, y_val,
-                                                sliding_window_size=args.sw_length,
-                                                unit=args.sw_unit,
-                                                sampling_rate=args.sampling_rate,
-                                                sliding_window_overlap=args.sw_overlap,
-                                                )
-
-            X_test, y_test = pd.DataFrame(), pd.DataFrame()
-
             args.window_size = X_train.shape[1]
             args.nb_channels = X_train.shape[2]
 
@@ -181,9 +171,8 @@ def per_participant_cv(data, args, log_date, log_timestamp):
             else:
                 print("Did not provide a valid network name!")
 
-            net, val_output, train_output, _ = train(X_train, y_train, X_val, y_val, X_test, y_test,
-                                                     network=net, config=vars(args), log_date=log_date,
-                                                     log_timestamp=log_timestamp)
+            net, val_output, train_output = train(X_train, y_train, X_val, y_val, network=net, config=vars(args),
+                                                  log_date=log_date, log_timestamp=log_timestamp)
 
             if all_eval_output is None:
                 all_eval_output = val_output
@@ -198,14 +187,14 @@ def per_participant_cv(data, args, log_date, log_timestamp):
             subject_f1 += f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=classes)
 
             # add up train val gap evaluation
-            subject_accuracy_gap = jaccard_score(train_output[:, 1], train_output[:, 0], average='macro') - \
-                                   jaccard_score(val_output[:, 1], val_output[:, 0], average='macro')
-            subject_precision_gap = precision_score(train_output[:, 1], train_output[:, 0], average='macro') - \
-                                    precision_score(val_output[:, 1], val_output[:, 0], average='macro')
-            subject_recall_gap = recall_score(train_output[:, 1], train_output[:, 0], average='macro') - \
-                                 recall_score(val_output[:, 1], val_output[:, 0], average='macro')
-            subject_f1_gap = f1_score(train_output[:, 1], train_output[:, 0], average='macro') - \
-                             f1_score(val_output[:, 1], val_output[:, 0], average='macro')
+            subject_accuracy_gap += jaccard_score(train_output[:, 1], train_output[:, 0], average='macro') - \
+                                    jaccard_score(val_output[:, 1], val_output[:, 0], average='macro')
+            subject_precision_gap += precision_score(train_output[:, 1], train_output[:, 0], average='macro') - \
+                                     precision_score(val_output[:, 1], val_output[:, 0], average='macro')
+            subject_recall_gap += recall_score(train_output[:, 1], train_output[:, 0], average='macro') - \
+                                  recall_score(val_output[:, 1], val_output[:, 0], average='macro')
+            subject_f1_gap += f1_score(train_output[:, 1], train_output[:, 0], average='macro') - \
+                              f1_score(val_output[:, 1], val_output[:, 0], average='macro')
 
         pp_scores[0, :, int(sbj)] = subject_accuracy / args.splits_sss
         pp_scores[1, :, int(sbj)] = subject_precision / args.splits_sss
@@ -236,44 +225,36 @@ def per_participant_cv(data, args, log_date, log_timestamp):
     return net
 
 
-def train_valid_test_split(X_train, y_train, X_val, y_val, X_test, y_test, args, log_date, log_timestamp):
+def train_valid_split(train_data, valid_data, args, log_date, log_timestamp):
     """
     Method to apply normal cross-validation, i.e. one set split into train, validation and testing data.
 
-    :param X_train: train features used for applying cross-validation
-    :param y_train: train labels used for applying cross-validation
-    :param X_val: validation features used for applying cross-validation
-    :param y_val: validation labels used for applying cross-validation
-    :param X_test: test features used for applying cross-validation
-    :param y_test: test labels used for applying cross-validation
+    :param train_data: train features & labels used for applying cross-validation
+    :param valid_data: validation features & labels used for applying cross-validation
     :param args: args object containing all relevant hyperparameters and settings
     :param log_date: date information needed for saving
     :param log_timestamp: timestamp information needed for saving
 
     :return trained network
     """
+    print('\nCALCULATING TRAIN-VALID-SPLIT SCORES.\n')
 
     # Sensor data is segmented using a sliding window mechanism
-    X_train, y_train = apply_sliding_window(args.dataset, X_train, y_train,
+    X_train, y_train = apply_sliding_window(train_data[:, :-1], train_data[:, -1],
                                             sliding_window_size=args.sw_length,
                                             unit=args.sw_unit,
                                             sampling_rate=args.sampling_rate,
                                             sliding_window_overlap=args.sw_overlap,
                                             )
 
-    X_val, y_val = apply_sliding_window(args.dataset, X_val, y_val,
+    X_val, y_val = apply_sliding_window(valid_data[:, :-1], valid_data[:, -1],
                                         sliding_window_size=args.sw_length,
                                         unit=args.sw_unit,
                                         sampling_rate=args.sampling_rate,
                                         sliding_window_overlap=args.sw_overlap,
                                         )
-    if X_test.size != 0:
-        X_test, y_test = apply_sliding_window(args.dataset, X_test, y_test,
-                                              sliding_window_size=args.sw_length,
-                                              unit=args.sw_unit,
-                                              sampling_rate=args.sampling_rate,
-                                              sliding_window_overlap=args.sw_overlap,
-                                              )
+
+    X_train, X_val = X_train[:, :, 1:], X_val[:, :, 1:]
 
     args.window_size = X_train.shape[1]
     args.nb_channels = X_train.shape[2]
@@ -283,9 +264,9 @@ def train_valid_test_split(X_train, y_train, X_val, y_val, X_test, y_test, args,
     else:
         print("Did not provide a valid network name!")
 
-    net, val_output, train_output, test_output = train(X_train, y_train, X_val, y_val, X_test, y_test,
-                                                       network=net, config=vars(args), log_date=log_date,
-                                                       log_timestamp=log_timestamp)
+    net, val_output, train_output = train(X_train, y_train, X_val, y_val,
+                                          network=net, config=vars(args), log_date=log_date,
+                                          log_timestamp=log_timestamp)
 
     cls = np.array(range(args.nb_classes))
     print('VALIDATION RESULTS: ')
@@ -299,23 +280,6 @@ def train_valid_test_split(X_train, y_train, X_val, y_val, X_test, y_test, args,
     print("Precision: {0}".format(precision_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
     print("Recall: {0}".format(recall_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
     print("F1: {0}".format(f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
-
-    if X_test.size != 0:
-        print('TEST RESULTS: ')
-        print("Avg. Accuracy: {0}".format(jaccard_score(test_output[:, 1], test_output[:, 0], average='macro')))
-        print("Avg. Precision: {0}".format(precision_score(test_output[:, 1], test_output[:, 0], average='macro')))
-        print("Avg. Recall: {0}".format(recall_score(test_output[:, 1], test_output[:, 0], average='macro')))
-        print("Avg. F1: {0}".format(f1_score(test_output[:, 1], test_output[:, 0], average='macro')))
-
-        print("TEST RESULTS (PER CLASS): ")
-        print("Accuracy: {0}".format(jaccard_score(test_output[:, 1], test_output[:, 0], average=None, labels=cls)))
-        print("Precision: {0}".format(precision_score(test_output[:, 1], test_output[:, 0], average=None, labels=cls)))
-        print("Recall: {0}".format(recall_score(test_output[:, 1], test_output[:, 0], average=None, labels=cls)))
-        print("F1: {0}".format(f1_score(test_output[:, 1], test_output[:, 0], average=None, labels=cls)))
-
-        if args.save_test_preds:
-            mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
-            np.save(os.path.join('logs', log_date, log_timestamp, 'test_preds.npy'), test_output)
 
     print("GENERALIZATION GAP ANALYSIS: ")
     print("Train-Val-Accuracy Difference: {0}".format(
@@ -332,3 +296,103 @@ def train_valid_test_split(X_train, y_train, X_val, y_val, X_test, y_test, args,
         f1_score(val_output[:, 1], val_output[:, 0], average='macro')))
 
     return net
+
+
+def k_fold(data, args, log_date, log_timestamp):
+    """
+    Method to apply per-participant cross-validation.
+
+    :param data: data used for applying cross-validation
+    :param args: args object containing all relevant hyperparameters and settings
+    :param log_date: date information needed for saving
+    :param log_timestamp: timestamp information needed for saving
+
+    :return trained network
+    """
+    print('\nCALCULATING K-FOLD SCORES USING STRATIFIED K-FOLD.\n')
+    # sensor data is segmented using a sliding window mechanism
+    X, y = apply_sliding_window(data[:, :-1], data[:, -1],
+                                sliding_window_size=args.sw_length,
+                                unit=args.sw_unit,
+                                sampling_rate=args.sampling_rate,
+                                sliding_window_overlap=args.sw_overlap,
+                                )
+
+    orig_lr = args.lr
+
+    skf = StratifiedKFold(n_splits=args.splits_kfold, shuffle=True, random_state=args.seed)
+
+    cls = np.array(range(args.nb_classes))
+    kfold_accuracy = np.zeros(args.nb_classes)
+    kfold_precision = np.zeros(args.nb_classes)
+    kfold_recall = np.zeros(args.nb_classes)
+    kfold_f1 = np.zeros(args.nb_classes)
+
+    kfold_accuracy_gap = 0
+    kfold_precision_gap = 0
+    kfold_recall_gap = 0
+    kfold_f1_gap = 0
+    for j, (train_index, test_index) in enumerate(skf.split(X, y)):
+        print('FOLD {0}/{1}'.format(j + 1, args.splits_kfold))
+
+        X_train, X_val = X[train_index], X[test_index]
+        y_train, y_val = y[train_index], y[test_index]
+        args.lr = orig_lr
+
+        args.window_size = X_train.shape[1]
+        args.nb_channels = X_train.shape[2]
+
+        if args.network == 'deepconvlstm':
+            net = DeepConvLSTM(config=vars(args))
+        else:
+            print("Did not provide a valid network name!")
+
+        net, val_output, train_output = train(X_train, y_train, X_val, y_val,
+                                              network=net, config=vars(args), log_date=log_date,
+                                              log_timestamp=log_timestamp)
+
+        fold_acc = jaccard_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)
+        fold_prec = precision_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)
+        fold_rec = recall_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)
+        fold_f1 = f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)
+
+        fold_acc_gap = jaccard_score(train_output[:, 1], train_output[:, 0], average='macro') - jaccard_score(val_output[:, 1], val_output[:, 0], average='macro')
+        fold_prec_gap = precision_score(train_output[:, 1], train_output[:, 0], average='macro') - precision_score(val_output[:, 1], val_output[:, 0], average='macro')
+        fold_rec_gap = recall_score(train_output[:, 1], train_output[:, 0], average='macro') - recall_score(val_output[:, 1], val_output[:, 0], average='macro')
+        fold_f1_gap = f1_score(train_output[:, 1], train_output[:, 0], average='macro') - f1_score(val_output[:, 1], val_output[:, 0], average='macro')
+
+        print("\nFOLD {0} VALIDATION RESULTS: ".format(j + 1))
+        print("Accuracy: {0}".format(np.mean(fold_acc)))
+        print("Precision: {0}".format(np.mean(fold_prec)))
+        print("Recall: {0}".format(np.mean(fold_rec)))
+        print("F1: {0}".format(np.mean(fold_f1)))
+
+        # add up fold evaluation results
+        kfold_accuracy += fold_acc
+        kfold_precision += fold_prec
+        kfold_recall += fold_rec
+        kfold_f1 += fold_f1
+
+        # add up train val gap evaluation
+        kfold_accuracy_gap += fold_acc_gap
+        kfold_precision_gap += fold_prec_gap
+        kfold_recall_gap += fold_rec_gap
+        kfold_f1_gap += fold_f1_gap
+
+    print("\nK-FOLD VALIDATION RESULTS: ")
+    print("Accuracy: {0}".format(np.mean(kfold_accuracy / args.splits_kfold)))
+    print("Precision: {0}".format(np.mean(kfold_precision / args.splits_kfold)))
+    print("Recall: {0}".format(np.mean(kfold_recall / args.splits_kfold)))
+    print("F1: {0}".format(np.mean(kfold_f1 / args.splits_kfold)))
+
+    print("\nVALIDATION RESULTS (PER CLASS): ")
+    print("Accuracy: {0}".format(kfold_accuracy / args.splits_kfold))
+    print("Precision: {0}".format(kfold_precision / args.splits_kfold))
+    print("Recall: {0}".format(kfold_recall / args.splits_kfold))
+    print("F1: {0}".format(kfold_f1 / args.splits_kfold))
+
+    print("\nGENERALIZATION GAP ANALYSIS:")
+    print("Accuracy: {0}".format(kfold_accuracy_gap / args.splits_kfold))
+    print("Precision: {0}".format(kfold_precision_gap / args.splits_kfold))
+    print("Recall: {0}".format(kfold_recall_gap / args.splits_kfold))
+    print("F1: {0}".format(kfold_f1_gap / args.splits_kfold))
