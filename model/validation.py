@@ -318,6 +318,8 @@ def k_fold(data, args, log_date, log_timestamp):
                                 sliding_window_overlap=args.sw_overlap,
                                 )
 
+    X = X[:, :, 1:]
+
     orig_lr = args.lr
 
     skf = StratifiedKFold(n_splits=args.splits_kfold, shuffle=True, random_state=args.seed)
@@ -396,3 +398,5 @@ def k_fold(data, args, log_date, log_timestamp):
     print("Precision: {0}".format(kfold_precision_gap / args.splits_kfold))
     print("Recall: {0}".format(kfold_recall_gap / args.splits_kfold))
     print("F1: {0}".format(kfold_f1_gap / args.splits_kfold))
+
+    return net

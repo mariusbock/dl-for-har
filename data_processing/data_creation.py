@@ -25,18 +25,19 @@ def milliseconds_to_hertz(start, end, rate):
     return int(np.floor(float(start) * adjusted_rate)), int(np.floor(float(end) * adjusted_rate))
 
 
-def create_wetlab_data_from_mkvs(feature_tracks, label_tracks, directory, sample_rate):
+def create_wetlab_data_from_mkvs(feature_tracks, label_tracks, raw_dir, save_dir, sample_rate):
     """
     Function which creates the a csv file using the WetLab mkv dataset files as input.
 
     :param feature_tracks: tracks which contain the features that are to be used from the wetlab mkvs
     :param label_tracks: tracks which contain the labels that are to be used from the wetlab mkvs
-    :param directory: directory where the resulting csv is to be saved to
+    :param raw_dir: directory where the raw files are located
+    :param save_dir: directory where the resulting csv is to be saved to
     :param sample_rate: sampling rate
 
     :return pandas dataframe containing wetlab features
     """
-    filenames = sorted(glob(os.path.join(directory, '*.mkv')))
+    filenames = sorted(glob(os.path.join(raw_dir, 'wetlab', '*.mkv')))
     # obtain unique labels
     unique_labels = []
     for filename in filenames:
@@ -69,14 +70,15 @@ def create_wetlab_data_from_mkvs(feature_tracks, label_tracks, directory, sample
     print(output.iloc[:, -1].value_counts())
     output.columns = ['subject_id', 'acc_x', 'acc_y', 'acc_z', 'activity_label_1', 'activity_label_2']
     output = output.astype({'subject_id': int, 'acc_x': float, 'acc_y': float, 'acc_z': float, 'activity_label_1': str, 'activity_label_2': str})
-    return output
+
+    output.to_csv(os.path.join(save_dir, 'wetlab_data.csv'), index=False, header=False)
 
 
-def create_sbhar_dataset(folder):
+def create_sbhar_dataset(raw_dir, save_dir):
     """
     Function to create SBHAR dataset (containing only acceleration data).
 
-    :param folder: folder in which raw data is contained
+    :param raw_dir: folder in which raw data is contained
 
     :return pandas dataframe containing all data
     """
@@ -97,8 +99,8 @@ def create_sbhar_dataset(folder):
         12: 'lie-to-stand'
     }
 
-    labels = np.loadtxt(os.path.join(folder, 'labels.txt'), delimiter=' ')
-    acc_data = [f for f in os.listdir(folder) if 'acc' in f]
+    labels = np.loadtxt(os.path.join(raw_dir, 'sbhar', 'labels.txt'), delimiter=' ')
+    acc_data = [f for f in os.listdir(os.path.join(raw_dir, 'sbhar')) if 'acc' in f]
     # gyro_data = [f for f in os.listdir(folder) if 'gyro' in f]
     output_data = None
 
@@ -112,7 +114,7 @@ def create_sbhar_dataset(folder):
         sbj_data = None
         # acc + gyro
         for acc_sbj_file in acc_sbj_files:
-            acc_tmp_data = np.loadtxt(os.path.join(folder, acc_sbj_file), delimiter=' ')
+            acc_tmp_data = np.loadtxt(os.path.join(raw_dir, 'sbhar', acc_sbj_file), delimiter=' ')
             sbj = re.sub('[^0-9]', '', acc_sbj_file.split('_')[2])
             exp = re.sub('[^0-9]', '', acc_sbj_file.split('_')[1])
             # gyro_tmp_data = np.loadtxt(os.path.join(folder, 'gyro_exp' + exp + '_user' + sbj + '.txt'), delimiter=' ')
@@ -134,18 +136,19 @@ def create_sbhar_dataset(folder):
     output_data.columns = ['subject_id', 'acc_x', 'acc_y', 'acc_z', 'activity_label']
     output_data = output_data.replace({'activity_label': label_dict})
     output_data = output_data.astype({'subject_id': int, 'acc_x': float, 'acc_y': float, 'acc_z': float, 'activity_label': str})
-    return output_data
+
+    output_data.to_csv(os.path.join(save_dir, 'sbhar_data.csv'), index=False, header=False)
 
 
-def create_hhar_dataset(folder):
+def create_hhar_dataset(raw_dir, save_dir):
     """
     Function to create HHAR dataset (containing only acceleration data).
 
-    :param folder: folder in which raw data is contained
+    :param raw_dir: folder in which raw data is contained
 
     :return pandas dataframe containing all data
     """
-    data = pd.read_csv(os.path.join(folder, 'Watch_accelerometer.csv'))
+    data = pd.read_csv(os.path.join(raw_dir, 'hhar', 'Watch_accelerometer.csv'))
 
     user_dict = {
         'a': 0,
@@ -163,10 +166,11 @@ def create_hhar_dataset(folder):
 
     data = data[['User', 'x', 'y', 'z', 'gt']]
     data = data.fillna('null_class')
-    return data
+
+    data.to_csv(os.path.join(save_dir, 'hhar_data.csv'), index=False, header=False)
 
 
-def create_rwhar_dataset(folder):
+def create_rwhar_dataset(raw_dir, save_dir):
     """
     Function to create RWHAR dataset (containing only acceleration data).
 
@@ -288,10 +292,11 @@ def create_rwhar_dataset(folder):
         print(dataset['activity'].value_counts())
         return dataset
 
-    data = clean_rwhar(folder, sel_location='forearm')
+    data = clean_rwhar(os.path.join(raw_dir, 'rwhar'), sel_location='forearm')
     data = data[['subject', 'acc_x', 'acc_y', 'acc_z', 'activity']]
     data = data.astype({'subject': int, 'acc_x': float, 'acc_y': float, 'acc_z': float, 'activity': str})
-    return data
+
+    data.to_csv(os.path.join(save_dir, 'rwhar_data.csv'), index=False, header=False)
 
 
 def create_opportunity_dataset(folder, output_folder):
@@ -501,25 +506,22 @@ def create_opportunity_dataset(folder, output_folder):
         # write Ordonez split
         full_data.iloc[:nb_test_samples, :].to_csv(target_filename + '_ordonez_data.csv', index=False, header=False)
 
-    generate_data(os.path.join(folder, 'OpportunityUCIDataset.zip'), output_folder)
+    generate_data(os.path.join(folder, 'opportunity', 'OpportunityUCIDataset.zip'), output_folder)
 
 
 if __name__ == '__main__':
+    raw_path = '../data/raw'
+    save_path = '../data'
+
     # opportunity
-    #create_opportunity_dataset('../data/raw/opportunity', '../data/opportunity')
+    create_opportunity_dataset(raw_path, save_path)
     # wetlab
-    #feat = lambda streams: [s for s in streams if s.type == "audio"]
-    #label = lambda streams: [s for s in streams if s.type == "subtitle"]
-    #create_wetlab_data_from_mkvs(feat, label, '../data/raw/wetlab', 50).to_csv(
-    #    '../data/wetlab_data.csv', index=False, header=False)
-
+    feat = lambda streams: [s for s in streams if s.type == "audio"]
+    label = lambda streams: [s for s in streams if s.type == "subtitle"]
+    create_wetlab_data_from_mkvs(feat, label, raw_path, save_path, 50)
     # sbhar
-    #create_sbhar_dataset('../data/raw/sbhar').to_csv(
-    #   '../data/sbhar_data.csv', index=False, header=False)
-
+    create_sbhar_dataset(raw_path, save_path)
     # hhar
-    create_hhar_dataset('../data/raw/hhar').to_csv(
-       '../data/hhar_data.csv', index=False, header=False)
+    create_hhar_dataset(raw_path, save_path)
     # rwhar
-    #create_rwhar_dataset('../data/raw/rwhar').to_csv(
-    #   '../data/rwhar_data.csv', index=False, header=False)
+    create_rwhar_dataset(raw_path, save_path)
