@@ -299,7 +299,7 @@ def create_rwhar_dataset(raw_dir, save_dir):
     data.to_csv(os.path.join(save_dir, 'rwhar_data.csv'), index=False, header=False)
 
 
-def create_opportunity_dataset(folder, output_folder):
+def create_opportunity_dataset(raw_dir, save_dir):
     """
     Funtion to create Opportunity dataset. Saves both data used in Ordonez et al. as well as full dataset. Preprocessing
     same as Ordonez et al.
@@ -468,7 +468,7 @@ def create_opportunity_dataset(folder, output_folder):
 
         return data
 
-    def generate_data(dataset, target_filename):
+    def generate_data(dataset, target_folder):
         """Function to read the OPPORTUNITY challenge raw data and process all sensor channels
         :param dataset: string
             Path with original OPPORTUNITY zip file
@@ -502,11 +502,11 @@ def create_opportunity_dataset(folder, output_folder):
         full_data[114] = adjust_idx_labels(full_data[114], 'locomotion')
         full_data[115] = adjust_idx_labels(full_data[115], 'gestures')
 
-        full_data.to_csv(target_filename + '_data.csv', index=False, header=False)
+        full_data.to_csv(os.path.join(target_folder, 'opportunity_data.csv'), index=False, header=False)
         # write Ordonez split
-        full_data.iloc[:nb_test_samples, :].to_csv(target_filename + '_ordonez_data.csv', index=False, header=False)
+        full_data.iloc[:nb_test_samples, :].to_csv(os.path.join(target_folder, 'opportunity_ordonez_data.csv'), index=False, header=False)
 
-    generate_data(os.path.join(folder, 'opportunity', 'OpportunityUCIDataset.zip'), output_folder)
+    generate_data(os.path.join(raw_path, 'opportunity', 'OpportunityUCIDataset.zip'), save_dir)
 
 
 if __name__ == '__main__':
