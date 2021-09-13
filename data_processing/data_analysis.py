@@ -63,4 +63,3 @@ def analyze_window_lengths(labels, subject_idx, sampling_rate):
                   'min. window length {:.1f} seconds, '.format(np.min(label_windows[:, 2].astype(float))),
                   'max. window length {:.1f} seconds'.format(np.max(label_windows[:, 2].astype(float)))
                   )
-from scipy.interpolate import make_interp_spline, BSpline
