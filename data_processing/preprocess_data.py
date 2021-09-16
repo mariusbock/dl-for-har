@@ -226,3 +226,74 @@ def adjust_labels(data_y, dataset, pred_type='actions'):
             data_y[data_y == 'drink_from_cup'] = 16
             data_y[data_y == 'toggle_switch'] = 17
     return data_y
+
+
+
+def getLastNonNaN(series, index, missingvalues=1):
+    if not pd.isna(series[index - 1]):
+        return series[index - 1], missingvalues
+    else:
+        return getLastNonNaN(series, index - 1)
+
+
+def getNextNonNaN(series, index, missingvalues=1):
+    if not pd.isna(series[index + 1]):
+        return series[index + 1], missingvalues
+    else:
+        return getNextNonNaN(series, index + 1, missingvalues=missingvalues + 1)
+
+
+def replaceNaNValues(series, output_dtype='float'):
+    if output_dtype == 'float':
+        if series is not np.array:
+            series = np.array(series)
+        if pd.isna(series[0]):
+            series[0] = series[1]
+        if pd.isna(series[series.shape[0] - 1]):
+            lastNonNan, numberOfMissingValues = getLastNonNaN(series, series.shape[0] - 1)
+            if numberOfMissingValues != 1:
+                for k in range(1, numberOfMissingValues):
+                    series[series.shape[0] - 1 - k] = lastNonNan
+            series[series.shape[0] - 1] = series[series.shape[0] - 2]
+        for x in range(0, series.shape[0]):
+            if pd.isna(series[x]):
+                lastNonNan, _ = getLastNonNaN(series, x)
+                nextNonNan, _ = getNextNonNaN(series, x)
+                missingValue = (lastNonNan + nextNonNan) / 2
+                series[x] = missingValue
+
+    elif output_dtype == 'int' or output_dtype == 'string':
+        if series is not np.array:
+            series = np.array(series)
+        if pd.isna(series[0]):
+            series[0] = series[1]
+        if pd.isna(series[series.shape[0] - 1]):
+            lastNonNan, numberOfMissingValues = getLastNonNaN(series, series.shape[0] - 1)
+            if numberOfMissingValues != 1:
+                for k in range(1, numberOfMissingValues):
+                    series[series.shape[0] - 1 - k] = lastNonNan
+            series[series.shape[0] - 1] = series[series.shape[0] - 2]
+        for x in range(0, series.shape[0]):
+            if pd.isna(series[x]):
+                lastNonNan, missingValuesLast = getLastNonNaN(series, x)
+                nextNonNan, missingValuesNext = getNextNonNaN(series, x)
+                if missingValuesLast < missingValuesNext:
+                    series[x] = lastNonNan
+                else:
+                    series[x] = nextNonNan
+    else:
+        print("Please choose a valid output dtype. You can choose between float, int and string.")
+        exit(0)
+
+    return pd.DataFrame(series, dtype=output_dtype)
+
+
+def interpolate(data, freq_old, freq_new):
+    tsAligned = np.divide(np.arange(0, data.shape[0]), freq_old)
+    timeStep = 1 / freq_new
+    tsCount = round(tsAligned[-1] / timeStep)
+    tsMax = tsCount * timeStep
+    tsNew = np.linspace(tsAligned[0], tsMax, tsCount + 1)
+    dataNew = np.interp(tsNew, tsAligned, data)
+
+    return tsNew, dataNew
