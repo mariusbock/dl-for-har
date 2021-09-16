@@ -101,7 +101,11 @@
         },
         "deploy": {
           "builder": "angular-cli-ghpages:deploy",
-          "options": {}
+          "options": {
+            "baseHref": "https://mariusbock.github.io/dl-for-har/",
+            "name": "Tutorial Deep Learning for HAR",
+            "email": "alexander.hoelzemann@uni-siegen.de"
+          }
         }
       }
     }
