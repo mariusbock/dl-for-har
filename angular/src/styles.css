@@ -1,2 +1,2 @@
 /* You can add global styles to this file, and also import other style files */
-$fa-font-path: "../node_modules/font-awesome/fonts";
+@import '~fullpage.js/dist/fullpage.min.css';
