@@ -4,6 +4,8 @@ import { BrowserModule } from '@angular/platform-browser';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { AngularFullpageModule } from '@fullpage/angular-fullpage';
+import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 
 @NgModule({
   declarations: [
@@ -12,7 +14,9 @@ import { AngularFullpageModule } from '@fullpage/angular-fullpage';
   imports: [
     BrowserModule,
     AppRoutingModule,
-    AngularFullpageModule
+    AngularFullpageModule,
+    NgbModule,
+    FontAwesomeModule
   ],
   providers: [],
   bootstrap: [AppComponent]
