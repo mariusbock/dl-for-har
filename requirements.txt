@@ -8,7 +8,7 @@ hpbandster==0.7.4
 pickle5==0.0.11
 prettytable==2.2.0
 cython==0.29.24
-pillow==8.3.1
+pillow==8.3.2
 pip==21.0.1
 wheel==0.37.0
 pytz==2021.1
