@@ -121,6 +121,7 @@ LR = 1e-4
 WEIGHT_DECAY = 1e-6
 WEIGHTS_INIT = 'xavier_normal'
 LOSS = 'cross_entropy'
+LS_SMOOTHING = 0.1
 GPU = 'cuda:0'
 SPLITS_KFOLD = 5
 SPLITS_SSS = 2
@@ -315,9 +316,9 @@ if __name__ == '__main__':
     parser.add_argument('--use_weights', default=USE_WEIGHTS, type=bool, help='use weighted loss')
     parser.add_argument('--filter_width', default=FILTER_WIDTH, type=int, help='filter size (convolutions)')
     parser.add_argument('--drop_prob', default=DROP_PROB, type=float, help='dropout probability before classifier')
-    parser.add_argument('--optimizer', default=OPTIMIZER, type=str,
-                        help='optimizer to be used (adam, rmsprop, adadelta)')
+    parser.add_argument('--optimizer', default=OPTIMIZER, type=str, help='optimizer to be used (adam, rmsprop, adadelta)')
     parser.add_argument('--loss', default=LOSS, type=str, help='loss to be used (e.g. cross_entropy)')
+    parser.add_argument('--ls_smoothing', default=LS_SMOTHING, type=float, help='degree of label smoothing (if employed)')
     parser.add_argument('--lr', default=LR, type=float, help='learning rate to be used')
     parser.add_argument('--gpu', default=GPU, type=str, help='gpu to be used (e.g. cuda:1)')
     parser.add_argument('--adj_lr', default=ADJ_LR, type=bool, help='adjust learning rate')

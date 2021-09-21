@@ -127,7 +127,7 @@ def plot_grad_flow(network):
     plt.grid(True)
 
 
-def init_optimizer_and_loss(network, optimizer, loss, lr, weight_decay, class_weights, gpu_name):
+def init_optimizer_and_loss(network, class_weights, config):
     """
     Initialises an optimizer and loss object for a given network.
 
@@ -141,14 +141,29 @@ def init_optimizer_and_loss(network, optimizer, loss, lr, weight_decay, class_we
     :return: optimizer and loss object
     """
     # define optimizer and loss
-    if optimizer == 'adadelta':
-        opt = torch.optim.Adadelta(network.parameters(), lr=lr, weight_decay=weight_decay)
-    elif optimizer == 'adam':
-        opt = torch.optim.Adam(network.parameters(), lr=lr, weight_decay=weight_decay)
-    elif optimizer == 'rmsprop':
-        opt = torch.optim.RMSprop(network.parameters(), lr=lr, weight_decay=weight_decay)
-    if loss == 'cross_entropy':
-        criterion = nn.CrossEntropyLoss(weight=torch.FloatTensor(class_weights).to(gpu_name))
+    if config['optimizer'] == 'adadelta':
+        opt = torch.optim.Adadelta(network.parameters(), lr=config['lr'], weight_decay=config['weight_decay'])
+    elif config['optimizer'] == 'adam':
+        opt = torch.optim.Adam(network.parameters(), lr=config['lr'], weight_decay=config['weight_decay'])
+    elif config['optimizer'] == 'rmsprop':
+        opt = torch.optim.RMSprop(network.parameters(), lr=config['lr'], weight_decay=config['weight_decay'])
+    if config['loss'] == 'cross_entropy':
+        criterion = nn.CrossEntropyLoss(weight=torch.FloatTensor(class_weights).to(config['gpu_name']))
+    elif config['loss'] == 'label_smoothing':
+        class LabelSmoothingLoss(nn.Module):
+            def __init__(self, smoothing=0.0):
+                super(LabelSmoothingLoss, self).__init__()
+                self.smoothing = smoothing
+
+            def forward(self, prediction, target):
+                assert 0 <= self.smoothing < 1
+                neglog_softmaxPrediction = -prediction.log_softmax(dim=1)
+
+                with torch.no_grad():
+                    smoothedLabels = self.smoothing / (prediction.size(1) - 1) * torch.ones_like(prediction)
+                    smoothedLabels.scatter_(1, target.data.unsqueeze(1), 1 - self.smoothing)
+                return torch.mean(torch.sum(smoothedLabels * neglog_softmaxPrediction, dim=1))
+        criterion = LabelSmoothingLoss(smoothing=config['ls_smoothing'])
     return opt, criterion
 
 
@@ -186,8 +201,7 @@ def train(train_features, train_labels, val_features, val_labels, network, confi
         class_weights = class_weight.compute_class_weight(None, classes=np.unique(train_labels + 1), y=train_labels + 1)
 
     # initialize optimizer and loss
-    opt, criterion = init_optimizer_and_loss(network, config['optimizer'], config['loss'], config['lr'],
-                                             config['weight_decay'], class_weights, config['gpu'])
+    opt, criterion = init_optimizer_and_loss(network, class_weights, config)
 
     # counters and objects used for early stopping and learning rate adjustment
     best_loss = np.inf
@@ -206,6 +220,8 @@ def train(train_features, train_labels, val_features, val_labels, network, confi
         TRAINING
         """
         # helper objects
+        train_preds = []
+        train_gt = []
         train_losses = []
         start_time = time.time()
         batch_num = 1
@@ -225,12 +241,18 @@ def train(train_features, train_labels, val_features, val_labels, network, confi
             # zero accumulated gradients
             opt.zero_grad()
             # send inputs through network to get predictions, calculate loss and backpropagate
-            output = network(inputs)
-            loss = criterion(output, targets.long())
+            train_output = network(inputs)
+            loss = criterion(train_output, targets.long())
             loss.backward()
             opt.step()
             # append train loss to list
             train_losses.append(loss.item())
+
+            # create predictions and append them to final list
+            y_preds = np.argmax(train_output.cpu().detach().numpy(), axis=-1)
+            y_true = targets.cpu().numpy().flatten()
+            train_preds = np.concatenate((np.array(train_preds, int), np.array(y_preds, int)))
+            train_gt = np.concatenate((np.array(train_gt, int), np.array(y_true, int)))
 
             # if verbose print out batch wise results (batch number, loss and time)
             if config['verbose']:
@@ -254,8 +276,6 @@ def train(train_features, train_labels, val_features, val_labels, network, confi
         val_preds = []
         val_gt = []
         val_losses = []
-        train_preds = []
-        train_gt = []
 
         # initialize train dataset and loader
         dataset = torch.utils.data.TensorDataset(torch.from_numpy(val_features).float(), torch.from_numpy(val_labels))
@@ -286,21 +306,6 @@ def train(train_features, train_labels, val_features, val_labels, network, confi
                 y_true = targets.cpu().numpy().flatten()
                 val_preds = np.concatenate((np.array(val_preds, int), np.array(y_preds, int)))
                 val_gt = np.concatenate((np.array(val_gt, int), np.array(y_true, int)))
-
-            # iterate over train dataset
-            for i, (x, y) in enumerate(trainloader):
-                # send x and y to GPU
-                inputs, targets = x.to(config['gpu']), y.to(config['gpu'])
-
-                # send inputs through network to get predictions and calculate softmax probabilities
-                train_output = network(inputs)
-                train_output = torch.nn.functional.softmax(train_output, dim=1)
-
-                # create predictions and append them to final list
-                y_preds = np.argmax(train_output.cpu().numpy(), axis=-1)
-                y_true = targets.cpu().numpy().flatten()
-                train_preds = np.concatenate((np.array(train_preds, int), np.array(y_preds, int)))
-                train_gt = np.concatenate((np.array(train_gt, int), np.array(y_true, int)))
 
             # print epoch evaluation results for train and validation dataset
             print("EPOCH: {}/{}".format(e + 1, config['epochs']),
