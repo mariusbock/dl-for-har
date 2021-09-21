@@ -148,7 +148,7 @@ def init_optimizer_and_loss(network, class_weights, config):
     elif config['optimizer'] == 'rmsprop':
         opt = torch.optim.RMSprop(network.parameters(), lr=config['lr'], weight_decay=config['weight_decay'])
     if config['loss'] == 'cross_entropy':
-        criterion = nn.CrossEntropyLoss(weight=torch.FloatTensor(class_weights).to(config['gpu_name']))
+        criterion = nn.CrossEntropyLoss(weight=torch.FloatTensor(class_weights).to(config['gpu']))
     elif config['loss'] == 'label_smoothing':
         class LabelSmoothingLoss(nn.Module):
             def __init__(self, smoothing=0.0):
