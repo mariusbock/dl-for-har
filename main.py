@@ -45,14 +45,14 @@ DATASET OPTIONS:
 - INCLUDE_NULL: boolean whether to include null class in datasets (does not work with opportunity_ordonez dataset)
 """
 
-DATASET = 'hhar'
+DATASET = 'rwhar'
 PRED_TYPE = 'gestures'
 CUTOFF_TYPE = 'subject'
 CUTOFF_TRAIN = 3
-CUTOFF_VALID = 5
-SW_LENGTH = 24
+CUTOFF_VALID = 80
+SW_LENGTH = 50
 SW_UNIT = 'units'
-SW_OVERLAP = 50
+SW_OVERLAP = 60
 MEANS_AND_STDS = False
 INCLUDE_NULL = True
 
@@ -81,7 +81,7 @@ NB_LAYERS_LSTM = 1
 CONV_BLOCK_TYPE = 'normal'
 NB_CONV_BLOCKS = 2
 NB_FILTERS = 64
-FILTER_WIDTH = 5
+FILTER_WIDTH = 11
 DILATION = 1
 DROP_PROB = 0.5
 POOLING = False
@@ -113,15 +113,15 @@ TRAINING OPTIONS:
 """
 
 SEED = 1
-VALID_TYPE = 'k-fold'
+VALID_TYPE = 'cross-participant'
 BATCH_SIZE = 100
-EPOCHS = 5
+EPOCHS = 30
 OPTIMIZER = 'adam'
 LR = 1e-4
 WEIGHT_DECAY = 1e-6
 WEIGHTS_INIT = 'xavier_normal'
-LOSS = 'cross_entropy'
-LS_SMOOTHING = 0.1
+LOSS = 'label_smoothing'
+LS_SMOOTHING = 0.0
 GPU = 'cuda:0'
 SPLITS_KFOLD = 5
 SPLITS_SSS = 2
@@ -143,7 +143,7 @@ LOGGING OPTIONS:
 - SAVE_GRADIENT_PLOT: boolean whether to save the gradient flow plot
 """
 
-LOGGING = False
+LOGGING = True
 PRINT_COUNTS = False
 VERBOSE = False
 PRINT_FREQ = 100
@@ -235,15 +235,19 @@ def main(args):
 
     print("Split datasets with size: | train {0} | valid {1} | test {2} |".format(train.shape, valid.shape, test.shape))
 
+    custom_net = None
+    custom_loss = None
+    custom_opt = None
+
     # cross-validation; either cross-participant, per-participant or normal
     if args.valid_type == 'cross-participant':
-        trained_net = cross_participant_cv(train_val, args, log_date, log_timestamp)
+        trained_net = cross_participant_cv(train_val, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp)
     elif args.valid_type == 'per-participant':
-        trained_net = per_participant_cv(train_val, args, log_date, log_timestamp)
+        trained_net = per_participant_cv(train_val, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp)
     elif args.valid_type == 'train-valid-split':
-        trained_net = train_valid_split(train, valid, args, log_date, log_timestamp)
+        trained_net = train_valid_split(train, valid, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp)
     elif args.valid_type == 'k-fold':
-        trained_net = k_fold(train_val, args, log_date, log_timestamp)
+        trained_net = k_fold(train_val, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp)
     else:
         print('Did not choose a valid validation type dataset!')
         exit()
@@ -318,7 +322,7 @@ if __name__ == '__main__':
     parser.add_argument('--drop_prob', default=DROP_PROB, type=float, help='dropout probability before classifier')
     parser.add_argument('--optimizer', default=OPTIMIZER, type=str, help='optimizer to be used (adam, rmsprop, adadelta)')
     parser.add_argument('--loss', default=LOSS, type=str, help='loss to be used (e.g. cross_entropy)')
-    parser.add_argument('--ls_smoothing', default=LS_SMOTHING, type=float, help='degree of label smoothing (if employed)')
+    parser.add_argument('--ls_smoothing', default=LS_SMOOTHING, type=float, help='degree of label smoothing (if employed)')
     parser.add_argument('--lr', default=LR, type=float, help='learning rate to be used')
     parser.add_argument('--gpu', default=GPU, type=str, help='gpu to be used (e.g. cuda:1)')
     parser.add_argument('--adj_lr', default=ADJ_LR, type=bool, help='adjust learning rate')

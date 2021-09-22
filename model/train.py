@@ -127,29 +127,15 @@ def plot_grad_flow(network):
     plt.grid(True)
 
 
-def init_optimizer_and_loss(network, class_weights, config):
+def init_loss(config):
     """
-    Initialises an optimizer and loss object for a given network.
+    Initialises an loss object for a given network.
 
-    :param network: network for which optimizer and loss are to be initialised
-    :param optimizer: type of optimizer to initialise (choose between 'adadelta' 'adam' or 'rmsprop')
-    :param loss: type of loss to initialise (currently only 'cross_entropy' supported)
-    :param lr: learning rate employed in optimizer
-    :param weight_decay: weight decay employed in optimizer
-    :param class_weights: class weights array to use during CEE loss calculation
-    :param gpu_name: name of the gpu which optimizer and loss are to be transferred to
-    :return: optimizer and loss object
+    :return: loss object
     """
-    # define optimizer and loss
-    if config['optimizer'] == 'adadelta':
-        opt = torch.optim.Adadelta(network.parameters(), lr=config['lr'], weight_decay=config['weight_decay'])
-    elif config['optimizer'] == 'adam':
-        opt = torch.optim.Adam(network.parameters(), lr=config['lr'], weight_decay=config['weight_decay'])
-    elif config['optimizer'] == 'rmsprop':
-        opt = torch.optim.RMSprop(network.parameters(), lr=config['lr'], weight_decay=config['weight_decay'])
-    if config['loss'] == 'cross_entropy':
-        criterion = nn.CrossEntropyLoss(weight=torch.FloatTensor(class_weights).to(config['gpu']))
-    elif config['loss'] == 'label_smoothing':
+    if config.loss == 'cross_entropy':
+        criterion = nn.CrossEntropyLoss()
+    elif config.loss == 'label_smoothing':
         class LabelSmoothingLoss(nn.Module):
             def __init__(self, smoothing=0.0):
                 super(LabelSmoothingLoss, self).__init__()
@@ -163,11 +149,28 @@ def init_optimizer_and_loss(network, class_weights, config):
                     smoothedLabels = self.smoothing / (prediction.size(1) - 1) * torch.ones_like(prediction)
                     smoothedLabels.scatter_(1, target.data.unsqueeze(1), 1 - self.smoothing)
                 return torch.mean(torch.sum(smoothedLabels * neglog_softmaxPrediction, dim=1))
-        criterion = LabelSmoothingLoss(smoothing=config['ls_smoothing'])
-    return opt, criterion
+        criterion = LabelSmoothingLoss(smoothing=config.ls_smoothing)
+    return criterion
 
 
-def train(train_features, train_labels, val_features, val_labels, network, config, log_date, log_timestamp):
+def init_optimizer(network, config):
+    """
+    Initialises an optimizer object for a given network.
+
+    :param network: network for which optimizer and loss are to be initialised
+    :return: optimizer object
+    """
+    # define optimizer and loss
+    if config.optimizer == 'adadelta':
+        opt = torch.optim.Adadelta(network.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+    elif config.optimizer == 'adam':
+        opt = torch.optim.Adam(network.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+    elif config.optimizer == 'rmsprop':
+        opt = torch.optim.RMSprop(network.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+    return opt
+
+
+def train(train_features, train_labels, val_features, val_labels, network, optimizer, loss, config, log_date, log_timestamp):
     """
     Method to train a PyTorch network.
 
@@ -176,6 +179,8 @@ def train(train_features, train_labels, val_features, val_labels, network, confi
     :param val_features: validation features
     :param val_labels: validation labels
     :param network: DeepConvLSTM network object
+    :param optimizer: optimizer object
+    :param loss: loss object
     :param config: config file which contains all training and hyperparameter settings
     :param log_date: date used for logging
     :param log_timestamp: timestamp used for logging
@@ -195,13 +200,18 @@ def train(train_features, train_labels, val_features, val_labels, network, confi
     # if weighted loss chosen, calculate weights based on training dataset; else each class is weighted equally
     if config['use_weights']:
         class_weights = class_weight.compute_class_weight('balanced', classes=np.unique(train_labels + 1), y=train_labels + 1)
+        if config['loss'] == 'cross_entropy':
+            loss.weights = class_weights
         print('Applied weighted class weights: ')
         print(class_weights)
     else:
         class_weights = class_weight.compute_class_weight(None, classes=np.unique(train_labels + 1), y=train_labels + 1)
+        if config['loss'] == 'cross_entropy':
+            loss.weights = class_weights
+
 
     # initialize optimizer and loss
-    opt, criterion = init_optimizer_and_loss(network, class_weights, config)
+    opt, criterion = optimizer, loss
 
     # counters and objects used for early stopping and learning rate adjustment
     best_loss = np.inf

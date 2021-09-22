@@ -7,14 +7,17 @@ from sklearn.model_selection import StratifiedShuffleSplit, StratifiedKFold
 from data_processing.sliding_window import apply_sliding_window
 from model.DeepConvLSTM import DeepConvLSTM
 from model.evaluate import evaluate_participant_scores
-from model.train import train
+from model.train import train, init_optimizer, init_loss
 
 
-def cross_participant_cv(data, args, log_date, log_timestamp):
+def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp):
     """
     Method to apply cross-participant cross-validation (also known as leave-one-subject-out cross-validation).
 
     :param data: data used for applying cross-validation
+    :param custom_net: custom network object
+    :param custom_loss: custom loss object
+    :param custom_opt: custom optimizer object
     :param args: args object containing all relevant hyperparameters and settings
     :param log_date: date information needed for saving
     :param log_timestamp: timestamp information needed for saving
@@ -54,14 +57,33 @@ def cross_participant_cv(data, args, log_date, log_timestamp):
         args.window_size = X_train.shape[1]
         args.nb_channels = X_train.shape[2]
 
+        # network initialization
         if args.network == 'deepconvlstm':
             net = DeepConvLSTM(config=vars(args))
+        elif args.network == 'custom':
+            net = custom_net
         else:
             print("Did not provide a valid network name!")
 
+        # optimizer initialization
+        if args.optimizer != 'custom':
+                opt = init_optimizer(net, args)
+        elif args.optimizer == 'custom':
+            opt = custom_opt
+        else:
+            print("Did not provide a valid optimizer name!")
+
+        # optimizer initialization
+        if args.loss != 'custom':
+            loss = init_loss(args)
+        elif args.loss == 'custom':
+            loss = custom_loss
+        else:
+            print("Did not provide a valid loss name!")
+
         net, val_output, train_output = train(X_train, y_train, X_val, y_val,
-                                              network=net, config=vars(args), log_date=log_date,
-                                              log_timestamp=log_timestamp)
+                                              network=net, optimizer=opt, loss=loss,
+                                              config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
 
         if all_eval_output is None:
             all_eval_output = val_output
@@ -109,11 +131,14 @@ def cross_participant_cv(data, args, log_date, log_timestamp):
     return net
 
 
-def per_participant_cv(data, args, log_date, log_timestamp):
+def per_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp):
     """
     Method to apply per-participant cross-validation.
 
     :param data: data used for applying cross-validation
+    :param custom_net: custom network object
+    :param custom_loss: custom loss object
+    :param custom_opt: custom optimizer object
     :param args: args object containing all relevant hyperparameters and settings
     :param log_date: date information needed for saving
     :param log_timestamp: timestamp information needed for saving
@@ -166,13 +191,33 @@ def per_participant_cv(data, args, log_date, log_timestamp):
             args.window_size = X_train.shape[1]
             args.nb_channels = X_train.shape[2]
 
+            # network initialization
             if args.network == 'deepconvlstm':
                 net = DeepConvLSTM(config=vars(args))
+            elif args.network == 'custom':
+                net = custom_net
             else:
                 print("Did not provide a valid network name!")
 
-            net, val_output, train_output = train(X_train, y_train, X_val, y_val, network=net, config=vars(args),
-                                                  log_date=log_date, log_timestamp=log_timestamp)
+            # optimizer initialization
+            if args.optimizer != 'custom':
+                opt = init_optimizer(net, args)
+            elif args.optimizer == 'custom':
+                opt = custom_opt
+            else:
+                print("Did not provide a valid optimizer name!")
+
+            # optimizer initialization
+            if args.loss != 'custom':
+                loss = init_loss(args)
+            elif args.loss == 'custom':
+                loss = custom_loss
+            else:
+                print("Did not provide a valid loss name!")
+
+            net, val_output, train_output = train(X_train, y_train, X_val, y_val,
+                                                  network=net, optimizer=opt, loss=loss,
+                                                  config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
 
             if all_eval_output is None:
                 all_eval_output = val_output
@@ -225,12 +270,15 @@ def per_participant_cv(data, args, log_date, log_timestamp):
     return net
 
 
-def train_valid_split(train_data, valid_data, args, log_date, log_timestamp):
+def train_valid_split(train_data, valid_data, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp):
     """
     Method to apply normal cross-validation, i.e. one set split into train, validation and testing data.
 
     :param train_data: train features & labels used for applying cross-validation
     :param valid_data: validation features & labels used for applying cross-validation
+    :param custom_net: custom network object
+    :param custom_loss: custom loss object
+    :param custom_opt: custom optimizer object
     :param args: args object containing all relevant hyperparameters and settings
     :param log_date: date information needed for saving
     :param log_timestamp: timestamp information needed for saving
@@ -259,14 +307,33 @@ def train_valid_split(train_data, valid_data, args, log_date, log_timestamp):
     args.window_size = X_train.shape[1]
     args.nb_channels = X_train.shape[2]
 
+    # network initialization
     if args.network == 'deepconvlstm':
         net = DeepConvLSTM(config=vars(args))
+    elif args.network == 'custom':
+        net = custom_net
     else:
         print("Did not provide a valid network name!")
 
+    # optimizer initialization
+    if args.optimizer != 'custom':
+        opt = init_optimizer(net, args)
+    elif args.optimizer == 'custom':
+        opt = custom_opt
+    else:
+        print("Did not provide a valid optimizer name!")
+
+    # optimizer initialization
+    if args.loss != 'custom':
+        loss = init_loss(args)
+    elif args.loss == 'custom':
+        loss = custom_loss
+    else:
+        print("Did not provide a valid loss name!")
+
     net, val_output, train_output = train(X_train, y_train, X_val, y_val,
-                                          network=net, config=vars(args), log_date=log_date,
-                                          log_timestamp=log_timestamp)
+                                          network=net, optimizer=opt, loss=loss,
+                                          config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
 
     cls = np.array(range(args.nb_classes))
     print('VALIDATION RESULTS: ')
@@ -298,11 +365,14 @@ def train_valid_split(train_data, valid_data, args, log_date, log_timestamp):
     return net
 
 
-def k_fold(data, args, log_date, log_timestamp):
+def k_fold(data, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp):
     """
     Method to apply per-participant cross-validation.
 
     :param data: data used for applying cross-validation
+    :param custom_net: custom network object
+    :param custom_loss: custom loss object
+    :param custom_opt: custom optimizer object
     :param args: args object containing all relevant hyperparameters and settings
     :param log_date: date information needed for saving
     :param log_timestamp: timestamp information needed for saving
@@ -344,14 +414,33 @@ def k_fold(data, args, log_date, log_timestamp):
         args.window_size = X_train.shape[1]
         args.nb_channels = X_train.shape[2]
 
+        # network initialization
         if args.network == 'deepconvlstm':
             net = DeepConvLSTM(config=vars(args))
+        elif args.network == 'custom':
+            net = custom_net
         else:
             print("Did not provide a valid network name!")
 
+        # optimizer initialization
+        if args.optimizer != 'custom':
+            opt = init_optimizer(net, args)
+        elif args.optimizer == 'custom':
+            opt = custom_opt
+        else:
+            print("Did not provide a valid optimizer name!")
+
+        # optimizer initialization
+        if args.loss != 'custom':
+            loss = init_loss(args)
+        elif args.loss == 'custom':
+            loss = custom_loss
+        else:
+            print("Did not provide a valid loss name!")
+
         net, val_output, train_output = train(X_train, y_train, X_val, y_val,
-                                              network=net, config=vars(args), log_date=log_date,
-                                              log_timestamp=log_timestamp)
+                                              network=net, optimizer=opt, loss=loss,
+                                              config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
 
         fold_acc = jaccard_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)
         fold_prec = precision_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)
