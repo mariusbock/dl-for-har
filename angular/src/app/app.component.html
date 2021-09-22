@@ -8,6 +8,7 @@
 <!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
 
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@200;400&display=swap');
   :host {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
     font-size: 14px;
@@ -34,6 +35,9 @@
     flex: 1;
   }
 
+  .ubicomp_iswc_font {
+    font-family: 'Sora', sans-serif;
+  }
   .toolbar {
     position: absolute;
     top: 0;
@@ -267,7 +271,7 @@
 </style>
 
 <!-- Toolbar -->
-<div class="toolbar" role="banner">
+<div class="toolbar ubicomp_iswc_font" role="banner">
   <a aria-label="UbiComp/ISWC 2021" target="_blank" rel="noopener" href="https://iswc.net/iswc21/"
      title="UbiComp/ISWC 2021">
     <!--    <img src="../assets/hfkoeccojlopload.png" width="auto" height="50">-->
@@ -301,7 +305,7 @@
   </a>
 </div>
 
-<div class="content" role="main">
+<div class="content ubicomp_iswc_font" role="main">
   <div fullpage id="fullpage" [options]="config" (ref)="getRef($event)">
     <div class="section  section_first">
       <div class="row">
