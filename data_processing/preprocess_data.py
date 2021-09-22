@@ -24,8 +24,8 @@ def load_dataset(dataset, pred_type='actions', include_null=False):
                        'stand_to_sit', 'sit_to_stand', 'sit_to_lie', 'lie_to_sit', 'stand_to_lie', 'lie_to_stand']
         sampling_rate = 50
         has_null = True
-    elif dataset == 'rwhar':
-        class_names = ['climbingdown', 'climbingup', 'jumping', 'lying', 'running', 'sitting', 'standing', 'walking']
+    elif dataset == 'rwhar' or dataset == 'rwhar_3sbjs':
+        class_names = ['climbing_down', 'climbing_up', 'jumping', 'lying', 'running', 'sitting', 'standing', 'walking']
         sampling_rate = 50
         has_null = False
     elif dataset == 'hhar':
@@ -185,7 +185,7 @@ def adjust_labels(data_y, dataset, pred_type='actions'):
         data_y[data_y == 'lie-to-sit'] = 10
         data_y[data_y == 'stand-to-lie'] = 11
         data_y[data_y == 'lie-to-stand'] = 12
-    elif dataset == 'rwhar':
+    elif dataset == 'rwhar' or dataset == 'rwhar_3sbjs':
         data_y[data_y == 'climbing_down'] = 0
         data_y[data_y == 'climbing_up'] = 1
         data_y[data_y == 'jumping'] = 2
