@@ -45,6 +45,7 @@
     background-color: #004e9b;
     color: white;
     font-weight: 600;
+    z-index: 1;
   }
 
   .toolbar img {
@@ -174,32 +175,6 @@
     color: #125699;
   }
 
-  .terminal {
-    position: relative;
-    width: 80%;
-    max-width: 600px;
-    border-radius: 6px;
-    padding-top: 45px;
-    margin-top: 8px;
-    overflow: hidden;
-    background-color: rgb(15, 15, 16);
-  }
-
-  .terminal::before {
-    content: "\2022 \2022 \2022";
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 4px;
-    background: rgb(58, 58, 58);
-    color: #c2c3c4;
-    width: 100%;
-    font-size: 2rem;
-    line-height: 0;
-    padding: 14px 0;
-    text-indent: 4px;
-  }
-
   .terminal pre {
     font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
     color: white;
@@ -207,38 +182,10 @@
     margin: 0;
   }
 
-  .circle-link {
-    height: 40px;
-    width: 40px;
-    border-radius: 40px;
-    margin: 8px;
-    background-color: white;
-    border: 1px solid #eeeeee;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
-    transition: 1s ease-out;
-  }
-
-
-  .circle-link:hover {
-    transform: translateY(-0.25rem);
-    box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.2);
-  }
-
   .section_first {
     margin: 8px;
     display: flex;
     justify-content: center;
-  }
-
-  .section_slides {
-    display: flex;
-    align-items: center !important;
-    justify-content: center !important;
-    width: auto !important;
   }
 
   footer {
@@ -251,25 +198,6 @@
   footer a {
     display: flex;
     align-items: center;
-  }
-
-  .github-star-badge {
-    color: #24292e;
-    display: flex;
-    align-items: center;
-    font-size: 12px;
-    padding: 3px 10px;
-    border: 1px solid rgba(27, 31, 35, .2);
-    border-radius: 3px;
-    background-image: linear-gradient(-180deg, #fafbfc, #eff3f6 90%);
-    margin-left: 4px;
-    font-weight: 600;
-  }
-
-  .github-star-badge:hover {
-    background-image: linear-gradient(-180deg, #f0f3f6, #e6ebf1 90%);
-    border-color: rgba(27, 31, 35, .35);
-    background-position: -.5em;
   }
 
   .github-star-badge .material-icons {
@@ -285,6 +213,18 @@
 
   iframe {
     width: 1000px;
+  }
+
+  #image-container {
+    width: 750px;
+    height: 360px !important;
+    text-align: center;
+    overflow: hidden;
+  }
+
+  #image-container img {
+    width: inherit;
+    height: 500px;
   }
 
   svg#clouds {
@@ -330,20 +270,20 @@
 <div class="toolbar" role="banner">
   <a aria-label="UbiComp/ISWC 2021" target="_blank" rel="noopener" href="https://iswc.net/iswc21/"
      title="UbiComp/ISWC 2021">
-<!--    <img src="../assets/hfkoeccojlopload.png" width="auto" height="50">-->
-        <img src="./assets/hfkoeccojlopload.png" width="auto" height="50">
+    <!--    <img src="../assets/hfkoeccojlopload.png" width="auto" height="50">-->
+    <img src="./assets/hfkoeccojlopload.png" width="auto" height="50">
   </a>
-  <span style="font-size:18.0pt">Virtual Tutorial Deep Learning for Human Activity Recognition</span>
+  <span style="font-size:1vw">Tutorial on Deep Learning for Human Activity Recognition</span>
   <div class="spacer"></div>
   <a aria-label="UbiComp Siegen" target="_blank" rel="noopener"
      href="https://ubicomp.eti.uni-siegen.de/home/index.html.en?lang=en" title="UbiComp Siegen">
-<!--        <img src="../assets/ubicomp_logo_1952x576a_white.png" width="169" height="50">-->
-        <img src="./assets/ubicomp_logo_1952x576a_white.png" width="169" height="50">
+<!--    <img src="../assets/ubicomp_logo_1952x576a.png" width="169" height="50">-->
+            <img src="./assets/ubicomp_logo_1952x576a_white.png" width="169" height="50">
   </a>
   <a aria-label="Computer Vision Siegen" target="_blank" rel="noopener"
-     href="http://www.ivg.informatik.uni-siegen.de/de/computer-vision" title="Computer Vision Siegen">
-<!--        <img src="../assets/cv_logo_small_0.png" width="50" height="50">-->
-        <img src="./assets/cv_logo_small_0.png" width="50" height="50">
+     href="https://www.vsa.informatik.uni-siegen.de/" title="Computer Vision Siegen">
+    <!--        <img src="../assets/cv_logo_small_0.png" width="50" height="50">-->
+    <img src="./assets/cv_logo_small_0.png" width="50vw" height="50vw">
   </a>
   <a aria-label="UbiComp Siegen on YouTube" target="_blank" rel="noopener"
      href="https://www.youtube.com/c/ubicompuniversityofsiegen" title="YouTube">
@@ -355,85 +295,116 @@
     </svg>
   </a>
   <a aria-label="Tutorial GitHub Repository" target="_blank" rel="noopener"
-     href="https://github.com/mariusbock/dl-for-har" title="GitHub">
-<!--        <img src="../assets/GitHub-Mark.png" height="40" width="auto">-->
-        <img src="./assets/GitHub-Mark.png" height="40" width="auto">
+     href="https://github.com/mariusbock/dl-for-har/tree/main/tutorial_notebooks" title="GitHub">
+    <!--        <img src="../assets/GitHub-Mark.png" height="40" width="auto">-->
+    <img src="./assets/GitHub-Mark.png" height="40" width="auto">
   </a>
 </div>
 
 <div class="content" role="main">
-
   <div fullpage id="fullpage" [options]="config" (ref)="getRef($event)">
     <div class="section  section_first">
-         <span>
+      <div class="row">
+        <div class="col">
           <h1>Welcome to our Tutorial about Deep Learning for Human Activity Recognition</h1>
-
-           TBD: Additional Information about Jupyter and Codelabs
-         </span>
-      <span>
-        <h3>ORGANIZERS</h3>
-        <span>
-          <b>Marius Bock</b> (University of Siegen, Germany),
-          <b>Alexander Hölzemann</b> (University of Siegen, Germany),
-          <b>Michael Moeller</b> (University of Siegen, Germany),
-          <b>Kristof Van Laerhoven</b> (University of Siegen, Germany)</span>
-      </span>
-      <span>
-        <h3>TUTORIAL SUMMARY</h3>
-        <span style="font-size: medium">
-          Physical activities play a crucial role in the way we structure our lives. Which activity, and how it is performed, can reveal a person’s intention, habit, fitness, and state of mind; it is therefore not surprising that a range of research fields, from cognitive science to healthcare, display a growing interest in the machine recognition of human activities. In 2014, Bulling et al. designed and organized an exceptionally well-received tutorial on human activity recognition from wearable sensor data. They introduced concepts such as the Activity Recognition Chain (ARC), a framework for designing and evaluating activity recognition systems, as well as a case study demonstrating how to work with this ARC. Within the last decade, deep learning methods have shown to outperform classical Machine Learning algorithms. We argue that releasing an updated tutorial that is adapted to work with deep learning techniques is long overdue.
-          This tutorial introduces the Deep Learning Activity Recognition Chain (DL-ARC), which encompasses the advances that have been made over the years within the field of deep learning for human activity recognition and deep learning. Our work directly ties into the works of Bulling et al. and functions as a step-by-step framework to apply deep learning to any activity recognition use case. Within this tutorial, we will show how state-of-the-art models can be achieved, while along the way explaining all design choices in detail.
-          This tutorial functions as a guide in the typical processes to design and evaluate deep learning architectures, once a human activity dataset has been recorded and annotated. We show through code snippets in a step-by-step process why certain steps are needed, how they affect the system’s outcome, and which pitfalls present themselves when designing a deep learning classifier. Participants do not need prior knowledge in human activity recognition or deep learning techniques, but should be familiar with programming in Python.
-        </span>
-      </span>
-      <span>
-        <h3>Tutorial Schedule</h3>
-        <!--        <img src="../assets/timeschedule.png" width="500" height=auto>-->
-        <img src="./assets/timeschedule.png" width="500" height=auto>
-      </span>
-    </div>
-
-    <div class="section center">
-      <h1 class="">Part 1: Introduction</h1>
-      <br>
-      <br>
-      <div class="center">
-        <iframe
-          src="https://docs.google.com/presentation/d/e/2PACX-1vQcNO2M-yXTBiQUOEs02rCrIzctVCN1CJ05xHWwID9JTibMsCz_VKpoXLeOL_zcS2hqgqsafYgY65S-/embed?start=false&loop=false&delayms=3000"
-          frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"
-          webkitallowfullscreen="true"></iframe>
-        <!--        <iframe-->
-        <!--          src="https://docs.google.com/presentation/d/e/2PACX-1vSRzLfzFMGd2xTBE6-ebaG6yG6gyMEcL9ZWzrLkLq91WYE6b6US45N-Do6T5hJ7r-dwjTV5T_CIY1Pf/embed?start=false&loop=false&delayms=3000"-->
-        <!--          frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"-->
-        <!--          webkitallowfullscreen="true"></iframe>-->
+          <br>
+          <br>
+        </div>
       </div>
-    </div>
-    <div class="section center" (click)="fullpage_api.moveSectionDown()">
-      <h1 class="">Part 2: Data Collection & Analysis </h1>
-      <br>
-      <br>
-      <div class="center">
-        <iframe
-          src="https://docs.google.com/presentation/d/e/2PACX-1vQcNO2M-yXTBiQUOEs02rCrIzctVCN1CJ05xHWwID9JTibMsCz_VKpoXLeOL_zcS2hqgqsafYgY65S-/embed?start=false&loop=false&delayms=3000"
-          frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"
-          webkitallowfullscreen="true"></iframe>
-        <!--        <iframe-->
-        <!--          src="https://docs.google.com/presentation/d/e/2PACX-1vSRzLfzFMGd2xTBE6-ebaG6yG6gyMEcL9ZWzrLkLq91WYE6b6US45N-Do6T5hJ7r-dwjTV5T_CIY1Pf/embed?start=false&loop=false&delayms=3000"-->
-        <!--          frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"-->
-        <!--          webkitallowfullscreen="true"></iframe>-->
-
+      <div class="row">
+        <div class="col">
+            <h3>ORGANIZERS</h3>
+              <b>Marius Bock</b> (University of Siegen, Germany),<br>
+              <b>Alexander Hölzemann</b> (University of Siegen, Germany),<br>
+              <b>Michael Moeller</b> (University of Siegen, Germany),<br>
+              <b>Kristof Van Laerhoven</b> (University of Siegen, Germany)<br>
+        </div>
       </div>
-    </div>
-    <!--    <div class="section">-->
-
-    <!--      <div class="slide">Slide 2.1</div>-->
-    <!--      <div class="slide">Slide 2.2</div>-->
-    <!--      <div class="slide">Slide 2.3</div>-->
-    <!--    </div>-->
-    <!--    <div class="section" (click)="fullpage_api.moveTo('secondPage', 2)">Some section4</div>-->
-    <!--  </div>-->
+      <br><br>
+      <div class="row">
+        <div class="col-md-6">
+          <h3>TUTORIAL SUMMARY</h3>
+          <p style="text-align: justify">
+            Physical activities play a crucial role in the way we structure our lives. Which activity, and how it is
+            performed, can reveal a person’s intention, habit, fitness, and state of mind; it is therefore not
+            surprising that a range of research fields, from cognitive science to healthcare, display a growing
+            interest in the machine recognition of human activities. In 2014, Bulling et al. designed and organized
+            an exceptionally well-received tutorial on human activity recognition from wearable sensor data. They
+            introduced concepts such as the Activity Recognition Chain (ARC), a framework for designing and
+            evaluating activity recognition systems, as well as a case study demonstrating how to work with this
+            ARC. Within the last decade, deep learning methods have shown to outperform classical Machine Learning
+            algorithms. We argue that releasing an updated tutorial that is adapted to work with deep learning
+            techniques is long overdue.
+            This tutorial introduces the Deep Learning Activity Recognition Chain (DL-ARC), which encompasses the
+            advances that have been made over the years within the field of deep learning for human activity
+            recognition and deep learning. Our work directly ties into the works of Bulling et al. and functions as
+            a step-by-step framework to apply deep learning to any activity recognition use case. Within this
+            tutorial, we will show how state-of-the-art models can be achieved, while along the way explaining all
+            design choices in detail.
+            This tutorial functions as a guide in the typical processes to design and evaluate deep learning
+            architectures, once a human activity dataset has been recorded and annotated. We show through code
+            snippets in a step-by-step process why certain steps are needed, how they affect the system’s outcome,
+            and which pitfalls present themselves when designing a deep learning classifier. Participants do not
+            need prior knowledge in human activity recognition or deep learning techniques, but should be familiar
+            with programming in Python.
+          </p>
+        </div>
+        <div class="col-md-4">
+          <h3>Additional Information</h3>
+          <p>
+            Jupyter and Colab
+          </p>
+        </div>
+      </div>
   </div>
+  <div class="section center">
+    <h1 class="">Time Schedule</h1>
+    <br>
+    <br>
+    <div class="center">
+      <img src="./assets/timeschedule.png">
+    </div>
+  </div>
+  <div class="section center">
+    <h1 class="">Part 1: Introduction</h1>
+    <br>
+    <br>
+    <div class="center">
+      <iframe
+        src="https://docs.google.com/presentation/d/e/2PACX-1vQcNO2M-yXTBiQUOEs02rCrIzctVCN1CJ05xHWwID9JTibMsCz_VKpoXLeOL_zcS2hqgqsafYgY65S-/embed?start=false&loop=false&delayms=3000"
+        frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"
+        webkitallowfullscreen="true"></iframe>
+      <!--        <iframe-->
+      <!--          src="https://docs.google.com/presentation/d/e/2PACX-1vSRzLfzFMGd2xTBE6-ebaG6yG6gyMEcL9ZWzrLkLq91WYE6b6US45N-Do6T5hJ7r-dwjTV5T_CIY1Pf/embed?start=false&loop=false&delayms=3000"-->
+      <!--          frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"-->
+      <!--          webkitallowfullscreen="true"></iframe>-->
+    </div>
+  </div>
+  <div class="section center" (click)="fullpage_api.moveSectionDown()">
+    <h1 class="">Part 2: Data Collection & Analysis </h1>
+    <br>
+    <br>
+    <div class="center">
+      <iframe
+        src="https://docs.google.com/presentation/d/e/2PACX-1vQcNO2M-yXTBiQUOEs02rCrIzctVCN1CJ05xHWwID9JTibMsCz_VKpoXLeOL_zcS2hqgqsafYgY65S-/embed?start=false&loop=false&delayms=3000"
+        frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"
+        webkitallowfullscreen="true"></iframe>
+      <!--        <iframe-->
+      <!--          src="https://docs.google.com/presentation/d/e/2PACX-1vSRzLfzFMGd2xTBE6-ebaG6yG6gyMEcL9ZWzrLkLq91WYE6b6US45N-Do6T5hJ7r-dwjTV5T_CIY1Pf/embed?start=false&loop=false&delayms=3000"-->
+      <!--          frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"-->
+      <!--          webkitallowfullscreen="true"></iframe>-->
 
+    </div>
+  </div>
+  <!--    <div class="section">-->
+
+  <!--      <div class="slide">Slide 2.1</div>-->
+  <!--      <div class="slide">Slide 2.2</div>-->
+  <!--      <div class="slide">Slide 2.3</div>-->
+  <!--    </div>-->
+  <!--    <div class="section" (click)="fullpage_api.moveTo('secondPage', 2)">Some section4</div>-->
+  <!--  </div>-->
+</div>
 </div>
 
 <!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
