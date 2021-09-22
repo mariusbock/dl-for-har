@@ -10,7 +10,7 @@ Physical activities play a crucial role in the way we structure our lives. Which
 ### Google Colab
 To work through the tutorial, we recommend you to use Google Colab. It offers an easy way for you to quickly run the code without needing to worry about your local setup. The links to each notebook are:
 
-- Introduction and Data Analysis
+- Data Collection and Analysis
 - Preprocessing
 - Evaluation
 - Training 
