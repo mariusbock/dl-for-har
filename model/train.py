@@ -103,6 +103,47 @@ def init_weights(network):
     return network
 
 
+## Implementation inspired by https://github.com/JonasGeiping/data-poisoning/
+# see forest / data / mixing_data_augmentations.py
+class Maxup(torch.nn.Module):
+    """A meta-augmentation, returning the worst result from a range of augmentations.
+    As in the orignal paper, https://arxiv.org/abs/2002.09024,
+    """
+
+    def __init__(self, given_data_augmentation, ntrials=4):
+        """Initialize with a given data augmentation module."""
+        super().__init__()
+        self.augment = given_data_augmentation
+        self.ntrials = ntrials
+        self.max_criterion = torch.nn.CrossEntropyLoss(reduction='none')
+
+    def forward(self, x, y):
+        additional_x, additional_labels = [], []
+        for trial in range(self.ntrials):
+            x_out, y_out = self.augment(x, y)
+            additional_x.append(x_out)
+            additional_labels.append(y_out)
+
+        additional_x = torch.cat(additional_x, dim=0)
+        additional_labels = torch.cat(additional_labels, dim=0)
+
+        return additional_x, additional_labels
+
+    def maxup_loss(self, outputs, extra_labels):
+        """Compute loss. Here the loss is computed as worst-case estimate over the trials."""
+        batch_size = outputs.shape[0] // self.ntrials
+        correct_preds = (torch.argmax(outputs.data, dim=1) == extra_labels).sum().item() / self.ntrials
+        stacked_loss = self.max_criterion(outputs, extra_labels).view(batch_size, self.ntrials, -1)
+        loss = stacked_loss.max(dim=1)[0].mean()
+
+        return loss, correct_preds
+
+
+def myNoiseAdditionAugmenter(x, y):
+    sigma = 0.5
+    return x + sigma*torch.randn_like(x), y
+
+
 def plot_grad_flow(network):
     """
     Function which plots the average gradient of a network.
@@ -150,6 +191,8 @@ def init_loss(config):
                     smoothedLabels.scatter_(1, target.data.unsqueeze(1), 1 - self.smoothing)
                 return torch.mean(torch.sum(smoothedLabels * neglog_softmaxPrediction, dim=1))
         criterion = LabelSmoothingLoss(smoothing=config.ls_smoothing)
+    elif config.loss == 'maxup':
+        return None
     return criterion
 
 
@@ -213,6 +256,15 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
     # initialize optimizer and loss
     opt, criterion = optimizer, loss
 
+    if config['loss'] == 'maxup':
+        maxup = Maxup(myNoiseAdditionAugmenter, ntrials=4)
+
+    # initialize training and validation dataset, define DataLoaders
+    dataset = torch.utils.data.TensorDataset(torch.from_numpy(train_features), torch.from_numpy(train_labels))
+    trainloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True)
+    dataset = torch.utils.data.TensorDataset(torch.from_numpy(val_features).float(), torch.from_numpy(val_labels))
+    valloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=False)
+
     # counters and objects used for early stopping and learning rate adjustment
     best_loss = np.inf
     best_network = None
@@ -236,27 +288,30 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
         start_time = time.time()
         batch_num = 1
 
-        # initialize train dataset and loader
-        dataset = torch.utils.data.TensorDataset(torch.from_numpy(train_features), torch.from_numpy(train_labels))
-        trainloader = DataLoader(dataset,
-                                 batch_size=config['batch_size'],
-                                 num_workers=2,
-                                 shuffle=False,
-                                 )
-
         # iterate over train dataset
         for i, (x, y) in enumerate(trainloader):
             # send x and y to GPU
             inputs, targets = x.to(config['gpu']), y.to(config['gpu'])
             # zero accumulated gradients
             opt.zero_grad()
+
+            if config['loss'] == 'maxup':
+                # Increase the inputs via data augmentation
+                inputs, targets = maxup(inputs, targets)
+
             # send inputs through network to get predictions, calculate loss and backpropagate
             train_output = network(inputs)
-            loss = criterion(train_output, targets.long())
-            loss.backward()
+
+            if config['loss'] == 'maxup':
+                # calculates loss
+                train_loss = maxup.maxup_loss(train_output, targets.long())[0]
+            else:
+                train_loss = criterion(train_output, targets.long())
+
+            train_loss.backward()
             opt.step()
             # append train loss to list
-            train_losses.append(loss.item())
+            train_losses.append(train_loss.item())
 
             # create predictions and append them to final list
             y_preds = np.argmax(train_output.cpu().detach().numpy(), axis=-1)
@@ -287,14 +342,6 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
         val_gt = []
         val_losses = []
 
-        # initialize train dataset and loader
-        dataset = torch.utils.data.TensorDataset(torch.from_numpy(val_features).float(), torch.from_numpy(val_labels))
-        valloader = DataLoader(dataset,
-                               batch_size=config['batch_size'],
-                               num_workers=2,
-                               shuffle=False,
-                               )
-
         # set network to eval mode
         network.eval()
         with torch.no_grad():
@@ -303,9 +350,18 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
                 # send x and y to GPU
                 inputs, targets = x.to(config['gpu']), y.to(config['gpu'])
 
+                if config['loss'] == 'maxup':
+                    # Increase the inputs via data augmentation
+                    inputs, targets = maxup(inputs, targets)
+
                 # send inputs through network to get predictions, loss and calculate softmax probabilities
                 val_output = network(inputs)
-                val_loss = criterion(val_output, targets.long())
+                if config['loss'] == 'maxup':
+                    # calculates loss
+                    val_loss = maxup.maxup_loss(val_output, targets.long())[0]
+                else:
+                    val_loss = criterion(val_output, targets.long())
+
                 val_output = torch.nn.functional.softmax(val_output, dim=1)
 
                 # append validation loss to list
