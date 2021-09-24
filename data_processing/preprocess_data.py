@@ -244,6 +244,7 @@ def getNextNonNaN(series, index, missingvalues=1):
 
 
 def replaceNaNValues(series, output_dtype='float'):
+
     if output_dtype == 'float':
         if series is not np.array:
             series = np.array(series)
@@ -285,7 +286,7 @@ def replaceNaNValues(series, output_dtype='float'):
         print("Please choose a valid output dtype. You can choose between float, int and string.")
         exit(0)
 
-    return pd.DataFrame(series, dtype=output_dtype)
+    return series.T
 
 
 def interpolate(data, freq_old, freq_new):
