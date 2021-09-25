@@ -25,3 +25,22 @@ def plot_imu_data(imu0, imu1, imu2, title):
     plt.tight_layout()
     fig.subplots_adjust(top=0.88)
     plt.show()
+
+def plot_data(data, title):
+
+    indices = []
+
+    for i in range(0, len(data)):
+        indices.append(i)
+    fig, axes = plt.subplots(1, 1, sharex=True, sharey=False, figsize=(14, 8))
+    x_patch = mpatches.Patch(color='orange', label='x-axis')
+    y_patch = mpatches.Patch(color='green', label='y-axis')
+    z_patch = mpatches.Patch(color='blue', label='z-axis')
+    plt.legend(handles=[x_patch, y_patch, z_patch])
+    axes.plot(data, lw=2, ls='-')
+    axes.set_ylabel('Acceleration (mg)', fontsize=12)
+    plt.xlabel('Index', fontsize=16)
+    plt.suptitle(title, fontsize=19)
+    plt.tight_layout()
+    fig.subplots_adjust(top=0.88)
+    plt.show()
