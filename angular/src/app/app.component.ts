@@ -18,7 +18,7 @@ export class AppComponent {
 
       // fullpage options
       licenseKey: 'YOUR LICENSE KEY HERE',
-      anchors: ['overview', 'schedule', 'chapterOne', 'chapterTwo', 'chapterThree', 'chapterFour', 'chapterFive', 'chapterSix'],
+      anchors: ['overview', 'schedule', 'chapterOne', 'chapterTwo', 'chapterThree', 'chapterFour', 'chapterFive', 'chapterSix', 'chapterSeven'],
       menu: '#menu',
 
       // fullpage callbacks

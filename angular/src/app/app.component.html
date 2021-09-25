@@ -9,6 +9,7 @@
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Sora:wght@200;400&display=swap');
+
   :host {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
     font-size: 14px;
@@ -38,6 +39,7 @@
   .ubicomp_iswc_font {
     font-family: 'Sora', sans-serif;
   }
+
   .toolbar {
     position: absolute;
     top: 0;
@@ -73,10 +75,9 @@
 
   .content {
     display: flex;
-    margin: 82px auto 32px;
-    padding: 0 16px;
+    margin: 82px 4px 32px;
+    padding: 0 20px;
     max-width: 1800px;
-    flex-direction: column;
     align-items: center;
   }
 
@@ -249,7 +250,6 @@
 
     .card:not(.highlight-card) {
       height: 16px;
-      margin: 8px 0;
     }
 
     .card.highlight-card span {
@@ -281,8 +281,8 @@
   <div class="spacer"></div>
   <a aria-label="UbiComp Siegen" target="_blank" rel="noopener"
      href="https://ubicomp.eti.uni-siegen.de/home/index.html.en?lang=en" title="UbiComp Siegen">
-<!--    <img src="../assets/ubicomp_logo_1952x576a.png" width="169" height="50">-->
-            <img src="./assets/ubicomp_logo_1952x576a_white.png" width="169" height="50">
+    <!--    <img src="../assets/ubicomp_logo_1952x576a.png" width="169" height="50">-->
+    <img src="./assets/ubicomp_logo_1952x576a_white.png" width="169" height="50">
   </a>
   <a aria-label="Computer Vision Siegen" target="_blank" rel="noopener"
      href="https://www.vsa.informatik.uni-siegen.de/" title="Computer Vision Siegen">
@@ -311,22 +311,23 @@
       <div class="row">
         <div class="col">
           <h1>Welcome to our Tutorial about Deep Learning for Human Activity Recognition</h1>
-          <br>
-          <br>
+          <div class="spacer">
+            <br>
+          </div>
         </div>
       </div>
       <div class="row">
         <div class="col">
-            <h3>ORGANIZERS</h3>
-              <b>Marius Bock</b> (University of Siegen, Germany),<br>
-              <b>Alexander Hölzemann</b> (University of Siegen, Germany),<br>
-              <b>Michael Moeller</b> (University of Siegen, Germany),<br>
-              <b>Kristof Van Laerhoven</b> (University of Siegen, Germany)<br>
+          <h3>ORGANIZERS</h3>
+          <b>Marius Bock</b> (University of Siegen, Germany),<br>
+          <b>Alexander Hölzemann</b> (University of Siegen, Germany),<br>
+          <b>Michael Moeller</b> (University of Siegen, Germany),<br>
+          <b>Kristof Van Laerhoven</b> (University of Siegen, Germany)<br>
         </div>
       </div>
       <br><br>
       <div class="row">
-        <div class="col-md-6">
+        <div class="col-md-8">
           <h3>TUTORIAL SUMMARY</h3>
           <p style="text-align: justify">
             Physical activities play a crucial role in the way we structure our lives. Which activity, and how it is
@@ -354,69 +355,110 @@
           </p>
         </div>
         <div class="col-md-4">
-          <h3>Additional Information</h3>
-          <p>
-            Jupyter and Colab
+          <h3>ADDITIONAL INFORMATION</h3>
+          <p style="text-align: justify">
+            Physical activities play a crucial role in the way we structure our lives. Which activity, and how it is
+            performed, can reveal a person’s intention, habit, fitness, and state of mind; it is therefore not
+            surprising that a range of research fields, from cognitive science to healthcare, display a growing interest
+            in the machine recognition of human activities. In 2014, Bulling et al. designed and organized an
+            exceptionally well-received tutorial on human activity recognition from wearable sensor data. They
+            introduced concepts such as the Activity Recognition Chain (ARC), a framework for designing
           </p>
         </div>
       </div>
-  </div>
-  <div class="section center">
-    <h1 class="">Time Schedule</h1>
-    <br>
-    <br>
-    <div class="center">
-      <img src="./assets/timeschedule.png">
+    </div>
+    <div class="section center">
+      <h1 class="">Time Schedule</h1>
+      <br>
+      <br>
+      <div class="center">
+        <img src="./assets/timeschedule.png">
+      </div>
+    </div>
+    <div class="section center">
+      <h1 class="">Part 1: Introduction</h1>
+      <br>
+      <br>
+      <div class="center">
+        <iframe
+          src="https://docs.google.com/presentation/d/e/2PACX-1vS1chAGPE0W6T751m2J-XXPQ3sLVov7zkGgxOOWNvRSb8pBrtzAV1V1HucGB4w859VYfYc8N_YhO0Kg/embed?start=false&loop=false&delayms=60000"
+          frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"
+          webkitallowfullscreen="true"></iframe>
+      </div>
+    </div>
+    <div class="section center" (click)="fullpage_api.moveSectionDown()">
+      <h1 class="">Part 2: Data Collection & Analysis </h1>
+      <br>
+      <br>
+      <div class="center">
+        <iframe
+          src="https://docs.google.com/presentation/d/e/2PACX-1vSK2aHYhmHmwhwpZtXTrtRf41A6Sr8bTaElyWgxqka6UIk6EucZ_Aaw0xac3Zp3PO0SqRLOLhNjQTJ1/embed?start=false&loop=false&delayms=60000"
+          frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"
+          webkitallowfullscreen="true"></iframe>
+
+      </div>
+    </div>
+    <div class="section center" (click)="fullpage_api.moveSectionDown()">
+      <h1 class="">Part 3: Preprocessing </h1>
+      <br>
+      <br>
+      <div class="center">
+        <iframe
+          src="https://docs.google.com/presentation/d/e/2PACX-1vSZ5pj74dNHqrsZGFC5vDPEeMNVm5Sy4VoU9Mpnk06mJe0e3LJh59EJl3p1FlKYXdeL6Vik-7SVD2Q0/embed?start=false&loop=false&delayms=60000"
+          frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"
+          webkitallowfullscreen="true"></iframe>
+
+      </div>
+    </div>
+    <div class="section center" (click)="fullpage_api.moveSectionDown()">
+      <h1 class="">Part 4: Training </h1>
+      <br>
+      <br>
+      <div class="center">
+        <iframe
+          src="https://docs.google.com/presentation/d/e/2PACX-1vRBKSuN4B-Eg3aZUoWRAuM6Tqu13U1Y9Msu8R0SrnE0Nco8b8InlUswwwS_7A9rTUd--YWeqn8IbRMl/embed?start=false&loop=false&delayms=60000"
+          frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"
+          webkitallowfullscreen="true"></iframe>
+      </div>
+    </div>
+    <div class="section center" (click)="fullpage_api.moveSectionDown()">
+      <h1 class="">Part 5: Validation and Testing </h1>
+      <br>
+      <br>
+      <div class="center">
+        <iframe
+          src="https://docs.google.com/presentation/d/e/2PACX-1vSfUj_-u3WJ5AC9A4AA9kZIDMlItXz7YTqieCUeMltxpakAcYcAIFBxBymsfz8a_ze8u3ulcGrWgLuk/embed?start=false&loop=false&delayms=60000"
+          frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"
+          webkitallowfullscreen="true"></iframe>
+      </div>
+    </div>
+    <div class="section center" (click)="fullpage_api.moveSectionDown()">
+      <h1 class="">Part 6: Next Research Steps </h1>
+      <br>
+      <br>
+      <div class="center">
+        <iframe
+          src="https://docs.google.com/presentation/d/e/2PACX-1vScWjejouMngUwH4DlVKQ3UBytURGu-GE2nOjwKlr1PJEsLkdvdSDGPqJOzo5IpFHTOJjJ7-uzNicqS/embed?start=false&loop=false&delayms=60000"
+          frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"
+          webkitallowfullscreen="true"></iframe>
+      </div>
+    </div>
+    <div class="section center" (click)="fullpage_api.moveSectionDown()">
+      <h1 class="">Part 7: Wrap Up </h1>
+      <br>
+      <br>
+      <div class="center">
+        <iframe src="https://docs.google.com/presentation/d/e/2PACX-1vTqWbA3xrO5yhVaAmHQ8JYgYbZe7zm1UIg_YAcqG1TVSr3okdGyo5UahynqqMW94byezBY1SqiIXD4E/embed?start=false&loop=false&delayms=60000" frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true" webkitallowfullscreen="true"></iframe>
+      </div>
     </div>
   </div>
-  <div class="section center">
-    <h1 class="">Part 1: Introduction</h1>
-    <br>
-    <br>
-    <div class="center">
-      <iframe
-        src="https://docs.google.com/presentation/d/e/2PACX-1vQcNO2M-yXTBiQUOEs02rCrIzctVCN1CJ05xHWwID9JTibMsCz_VKpoXLeOL_zcS2hqgqsafYgY65S-/embed?start=false&loop=false&delayms=3000"
-        frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"
-        webkitallowfullscreen="true"></iframe>
-      <!--        <iframe-->
-      <!--          src="https://docs.google.com/presentation/d/e/2PACX-1vSRzLfzFMGd2xTBE6-ebaG6yG6gyMEcL9ZWzrLkLq91WYE6b6US45N-Do6T5hJ7r-dwjTV5T_CIY1Pf/embed?start=false&loop=false&delayms=3000"-->
-      <!--          frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"-->
-      <!--          webkitallowfullscreen="true"></iframe>-->
-    </div>
-  </div>
-  <div class="section center" (click)="fullpage_api.moveSectionDown()">
-    <h1 class="">Part 2: Data Collection & Analysis </h1>
-    <br>
-    <br>
-    <div class="center">
-      <iframe
-        src="https://docs.google.com/presentation/d/e/2PACX-1vQcNO2M-yXTBiQUOEs02rCrIzctVCN1CJ05xHWwID9JTibMsCz_VKpoXLeOL_zcS2hqgqsafYgY65S-/embed?start=false&loop=false&delayms=3000"
-        frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"
-        webkitallowfullscreen="true"></iframe>
-      <!--        <iframe-->
-      <!--          src="https://docs.google.com/presentation/d/e/2PACX-1vSRzLfzFMGd2xTBE6-ebaG6yG6gyMEcL9ZWzrLkLq91WYE6b6US45N-Do6T5hJ7r-dwjTV5T_CIY1Pf/embed?start=false&loop=false&delayms=3000"-->
-      <!--          frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"-->
-      <!--          webkitallowfullscreen="true"></iframe>-->
 
-    </div>
-  </div>
-  <!--    <div class="section">-->
+  <!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
+  <!-- * * * * * * * * * * * The content above * * * * * * * * * * * -->
+  <!-- * * * * * * * * * * is only a placeholder * * * * * * * * * * -->
+  <!-- * * * * * * * * * * and can be replaced. * * * * * * * * * * * -->
+  <!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
+  <!-- * * * * * * * * * * End of Placeholder * * * * * * * * * * * -->
+  <!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
 
-  <!--      <div class="slide">Slide 2.1</div>-->
-  <!--      <div class="slide">Slide 2.2</div>-->
-  <!--      <div class="slide">Slide 2.3</div>-->
-  <!--    </div>-->
-  <!--    <div class="section" (click)="fullpage_api.moveTo('secondPage', 2)">Some section4</div>-->
-  <!--  </div>-->
-</div>
-</div>
-
-<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
-<!-- * * * * * * * * * * * The content above * * * * * * * * * * * -->
-<!-- * * * * * * * * * * is only a placeholder * * * * * * * * * * -->
-<!-- * * * * * * * * * * and can be replaced. * * * * * * * * * * * -->
-<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
-<!-- * * * * * * * * * * End of Placeholder * * * * * * * * * * * -->
-<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
-
-<router-outlet></router-outlet>
+  <router-outlet></router-outlet>
