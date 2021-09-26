@@ -10,11 +10,20 @@ Physical activities play a crucial role in the way we structure our lives. Which
 ### Google Colab
 To work through the tutorial, we recommend you to use Google Colab. It offers an easy way for you to quickly run the code without needing to worry about your local setup. The links to each notebook are:
 
-- Data Collection and Analysis
-- Preprocessing
-- Evaluation
-- Training 
-- Validation and Testing
-- Next Research Steps
+- Data Collection and Analysis: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/data_collection.ipynb
+- Preprocessing: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/preprocessing.ipynb
+- Evaluation: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/evaluation.ipynb
+- Training: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/training.ipynb
+- Validation and Testing: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/validation_and_testing.ipynb
+- Next Research Steps: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/next_research_steps.ipynb
 
+Note that these notebooks will have blanks, which you need to fill in! The links to the solution files are:
+
+- Data Collection and Analysis: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/solutions/data_collection_solution.ipynb
+- Preprocessing: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/solutions/preprocessing_solution.ipynb
+- Evaluation: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/solutions/evaluation_solution.ipynb
+- Training: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/solutions/training_solution.ipynb
+- Validation and Testing: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/solutions/validation_and_testing_solution.ipynb
+- Next Research Steps: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/solutions/next_research_steps_solution.ipynb
+- (Optional) Example Point Classification 2D: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/solutions/example_point_classification2d.ipynb
 ### Local deployment
