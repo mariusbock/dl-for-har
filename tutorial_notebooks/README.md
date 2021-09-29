@@ -26,4 +26,10 @@ Note that these notebooks will have blanks, which you need to fill in! The links
 - Validation and Testing: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/solutions/validation_and_testing_solution.ipynb
 - Next Research Steps: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/solutions/next_research_steps_solution.ipynb
 - (Optional) Example Point Classification 2D: https://colab.research.google.com/github/mariusbock/dl-for-har/blob/main/tutorial_notebooks/solutions/example_point_classification2d.ipynb
+
+
+**Important**: In order for the notebooks to be run properly, one needs to run some mandatory code (seen in the first code cell of each notebook). Set `use_colab=True` in order for the code to run every necessary prerequisite when using Google Colab.
+
 ### Local deployment
+
+All notebooks are also possible to be run locally. To do so make sure that your Python distribution has all necessary packages installed which are mentioned in the `requirements.txt` of the main GitHub repository. Also make sure to set `use_colab=False` within the first code cell of each notebook. Using local deployment you will be also able to switch out the dataset which is loaded within the tutorial notebooks. To do so download the preprocessed datasets which work with the repository from [here](https://uni-siegen.sciebo.de/s/sMWQ2vJhDzM6sil) (PW: iswc21).
