@@ -36,4 +36,4 @@ All notebooks are also possible to be run locally. To do so make sure that your 
 
 ## Citation
 <a id="cite">Cite this work as: </a><br/> 
-Marius Bock, Alexander Hölzemann, Michael Moeller, and Kristof Van Laerhoven. 2021. Tutorial on Deep Learning for HAR. https://arxiv.org/abs/2110.06663
+Marius Bock, Alexander Hölzemann, Michael Moeller, and Kristof Van Laerhoven. 2021. Tutorial on Deep Learning for Human Activity Recognition. https://arxiv.org/abs/2110.06663
