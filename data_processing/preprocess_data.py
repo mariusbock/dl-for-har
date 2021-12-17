@@ -1,3 +1,12 @@
+##################################################
+# All functions related to preprocessing and loading data
+##################################################
+# Author: Marius Bock
+# Email: marius.bock(at)uni-siegen.de
+# Author: Alexander Hölzemann
+# Email: alexander.hoelzemann(at)uni-siegen.de
+##################################################
+
 import os
 
 import pandas as pd
@@ -7,6 +16,18 @@ pd.options.mode.chained_assignment = None
 
 
 def load_dataset(dataset, pred_type='actions', include_null=False):
+    """
+    Main function to load one of the supported datasets
+
+    :param dataset: string
+        Name of dataset to be loaded
+    :param pred_type: string
+        Prediction type which is to be used (if multi-target dataset)
+    :param include_null: boolean, default: False
+        Whether to include null class in dataframe
+    :return: numpy float arrays, int, list of strings, int, boolean
+        features, labels, number of classes, class names, sampling rate and boolean has_null
+    """
     if dataset == 'wetlab':
         if pred_type == 'actions':
             class_names = ['cutting', 'inverting', 'peeling', 'pestling', 'pipetting', 'pouring', 'stirring',
@@ -68,7 +89,7 @@ def preprocess_data(data, ds, pt='actions', has_null=False, include_null=True):
         Name of dataset
     :param pt: string, ['actions' (default), 'tasks']
         Type of labels that are to be used
-    :param has_null: boolean, default: True
+    :param has_null: boolean, default: False
         Boolean signaling whether dataset has a null class
     :param include_null: boolean, default: True
         Boolean signaling whether to include or not include the null class in the dataset
@@ -127,6 +148,8 @@ def adjust_labels(data_y, dataset, pred_type='actions'):
 
     :param data_y: numpy integer array
         Sensor labels
+    :param dataset: string
+        String indicating which dataset is to be adjusted
     :param pred_type: string, ['gestures', 'locomotion', 'actions', 'tasks']
         Type of activities to be recognized
     :return: numpy integer array
@@ -228,38 +251,70 @@ def adjust_labels(data_y, dataset, pred_type='actions'):
     return data_y
 
 
+def get_last_non_nan(series, index, missingvalues=1):
+    """
+    Get value of last non-NaN value in a series
 
-def getLastNonNaN(series, index, missingvalues=1):
+    :param series: pandas series
+        Input data
+    :param index: int
+        Index from where to start checking
+    :param missingvalues: int, default: 1
+        Number of missing values
+    :return:
+        Value of last non-NaN in a series
+    """
     if not pd.isna(series[index - 1]):
         return series[index - 1], missingvalues
     else:
-        return getLastNonNaN(series, index - 1)
+        return get_last_non_nan(series, index - 1)
 
 
-def getNextNonNaN(series, index, missingvalues=1):
+def get_next_non_nan(series, index, missingvalues=1):
+    """
+    Get value of next non-NaN value in a series
+
+    :param series: pandas series
+        Input data
+    :param index: int
+        Index from where to start checking
+    :param missingvalues: int, default: 1
+        Number of missing values
+    :return: series value, int
+        Value of next non-NaN in a series
+    """
     if not pd.isna(series[index + 1]):
         return series[index + 1], missingvalues
     else:
-        return getNextNonNaN(series, index + 1, missingvalues=missingvalues + 1)
+        return get_next_non_nan(series, index + 1, missingvalues=missingvalues + 1)
 
 
-def replaceNaNValues(series, output_dtype='float'):
+def replace_nan_values(series, output_dtype='float'):
+    """
+    Function to replace NaN values in a series
 
+    :param series: data series
+        Data to be filled
+    :param output_dtype: string, default: float
+        Output datatype of series
+    :return: pandas series
+        Filled series (transposed)
+    """
     if output_dtype == 'float':
         if series is not np.array:
             series = np.array(series)
         if pd.isna(series[0]):
             series[0] = series[1]
         if pd.isna(series[series.shape[0] - 1]):
-            lastNonNan, numberOfMissingValues = getLastNonNaN(series, series.shape[0] - 1)
+            lastNonNan, numberOfMissingValues = get_last_non_nan(series, series.shape[0] - 1)
             if numberOfMissingValues != 1:
                 for k in range(1, numberOfMissingValues):
                     series[series.shape[0] - 1 - k] = lastNonNan
             series[series.shape[0] - 1] = series[series.shape[0] - 2]
         for x in range(0, series.shape[0]):
             if pd.isna(series[x]):
-                lastNonNan, _ = getLastNonNaN(series, x)
-                nextNonNan, _ = getNextNonNaN(series, x)
+                lastNonNan, _ = get_last_non_nan(series, x)
+                nextNonNan, _ = get_next_non_nan(series, x)
                 missingValue = (lastNonNan + nextNonNan) / 2
                 series[x] = missingValue
 
@@ -269,15 +324,15 @@ def replaceNaNValues(series, output_dtype='float'):
         if pd.isna(series[0]):
             series[0] = series[1]
         if pd.isna(series[series.shape[0] - 1]):
-            lastNonNan, numberOfMissingValues = getLastNonNaN(series, series.shape[0] - 1)
+            lastNonNan, numberOfMissingValues = get_last_non_nan(series, series.shape[0] - 1)
             if numberOfMissingValues != 1:
                 for k in range(1, numberOfMissingValues):
                     series[series.shape[0] - 1 - k] = lastNonNan
             series[series.shape[0] - 1] = series[series.shape[0] - 2]
         for x in range(0, series.shape[0]):
             if pd.isna(series[x]):
-                lastNonNan, missingValuesLast = getLastNonNaN(series, x)
-                nextNonNan, missingValuesNext = getNextNonNaN(series, x)
+                lastNonNan, missingValuesLast = get_last_non_nan(series, x)
+                nextNonNan, missingValuesNext = get_next_non_nan(series, x)
                 if missingValuesLast < missingValuesNext:
                     series[x] = lastNonNan
                 else:
@@ -290,6 +345,18 @@ def replaceNaNValues(series, output_dtype='float'):
 
 
 def interpolate(data, freq_old, freq_new):
+    """
+    Function which changes the sampling rate of some data via interpolation
+
+    :param data: numpy array
+        Data to be resampled
+    :param freq_old: int
+        Old sampling rate
+    :param freq_new: int
+        New sampling rate
+    :return: numpy float array
+        Resampled data
+    """
     tsAligned = np.divide(np.arange(0, data.shape[0]), freq_old)
     timeStep = 1 / freq_new
     tsCount = round(tsAligned[-1] / timeStep)

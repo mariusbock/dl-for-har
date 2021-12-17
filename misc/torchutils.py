@@ -1,3 +1,10 @@
+##################################################
+# Helper functions (pytorch-related)
+##################################################
+# Author: Marius Bock
+# Email: marius.bock(at)uni-siegen.de
+##################################################
+
 import os
 import random
 import numpy as np
@@ -6,6 +13,12 @@ from prettytable import PrettyTable
 
 
 def seed_torch(seed):
+    """
+    Function which seeds torch and all related random aspects of a python distribution
+
+    :param seed: int
+        Random seed to employ
+    """
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
@@ -17,6 +30,12 @@ def seed_torch(seed):
 
 
 def count_parameters(model):
+    """
+    Function which prints the amount of learnable parameters per network element + total
+
+    :param model: pytorch model
+        Model to be analysed
+    """
     table = PrettyTable(["Modules", "Parameters"])
     total_learn_params = 0
     for name, parameter in model.named_parameters():

@@ -1,12 +1,35 @@
+##################################################
+# All functions related to analysing sensor data
+##################################################
+# Author: Marius Bock
+# Email: marius.bock(at)uni-siegen.de
+##################################################
+
 import numpy as np
 
 
 def max_min_values(data):
+    """
+    Function which prints the min and max value for each column of a dataset
+
+    :param data: dataframe
+        Data to be analysed
+    """
     for i, column in enumerate(data.T):
         print('Column {}:'.format(i), 'min: {} max: {}'.format(min(column), max(column)))
 
 
 def analyze_window_lengths(labels, subject_idx, sampling_rate):
+    """
+    Function which analyses and prints the avg. window lengths (of each label)
+
+    :param labels: list
+        List of label names
+    :param subject_idx: list
+        List of subject identifiers
+    :param sampling_rate: int
+         Sampling rate of dataset
+    """
     curr_label = None
     curr_window = 0
     curr_subject = -1

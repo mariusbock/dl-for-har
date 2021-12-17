@@ -1,8 +1,28 @@
+##################################################
+# All functions related to plotting and visualizing data
+##################################################
+# Author: Kristof Van Laerhoven
+# Email: kvl(at)eti.uni-siegen.de
+##################################################
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
-def plot_imu_data(imu0, imu1, imu2, title):
 
+def plot_imu_data(imu0, imu1, imu2, title):
+    """
+    Function to plot three IMU data streams
+
+    :param imu0: data series
+        First IMU data stream
+    :param imu1: data series
+        Second IMU data stream
+    :param imu2: data series
+        Third IMU data stream
+    :param title: string
+        Title of plot
+    :return:
+    """
     indices = []
 
     for i in range(0, len(imu1)):
@@ -26,8 +46,17 @@ def plot_imu_data(imu0, imu1, imu2, title):
     fig.subplots_adjust(top=0.88)
     plt.show()
 
-def plot_data(data, title):
 
+def plot_data(data, title):
+    """
+    Function to plot data
+
+    :param data: dataframe
+        Data to be plotted
+    :param title: string
+        Title of plot
+    :return:
+    """
     indices = []
 
     for i in range(0, len(data)):

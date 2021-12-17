@@ -1,3 +1,10 @@
+##################################################
+# Main script used to commence experiments
+##################################################
+# Author: Marius Bock
+# Email: marius.bock(at)uni-siegen.de
+##################################################
+
 import argparse
 import os
 import time
@@ -45,13 +52,13 @@ DATASET OPTIONS:
 - INCLUDE_NULL: boolean whether to include null class in datasets (does not work with opportunity_ordonez dataset)
 """
 
-DATASET = 'rwhar'
+DATASET = 'opportunity_ordonez'
 PRED_TYPE = 'gestures'
 CUTOFF_TYPE = 'subject'
-CUTOFF_TRAIN = 3
-CUTOFF_VALID = 80
-SW_LENGTH = 50
-SW_UNIT = 'units'
+CUTOFF_TRAIN = 10
+CUTOFF_VALID = 12
+SW_LENGTH = 1
+SW_UNIT = 'seconds'
 SW_OVERLAP = 60
 MEANS_AND_STDS = False
 INCLUDE_NULL = True
@@ -81,7 +88,7 @@ NB_LAYERS_LSTM = 1
 CONV_BLOCK_TYPE = 'normal'
 NB_CONV_BLOCKS = 2
 NB_FILTERS = 64
-FILTER_WIDTH = 11
+FILTER_WIDTH = 5
 DILATION = 1
 DROP_PROB = 0.5
 POOLING = False
@@ -101,14 +108,18 @@ TRAINING OPTIONS:
 - LR: learning rate to employ for optimizer
 - WEIGHT_DECAY: weight decay to employ for optimizer
 - WEIGHTS_INIT: weight initialization method to use to initialize network
-- LOSS: loss to use; currently only 'cross_entropy' supported
+- LOSS: loss to use ('cross_entropy', 'maxup')
+- SMOOTHING: degree of label smoothing employed if cross-entropy used
 - GPU: name of GPU to use (e.g. 'cuda:0')
 - SPLITS_KFOLD: number of splits for stratified k-fold cross-validation
-- SPLITS_SSS: number of stratified splits for each subject in per-participant evaluation
-- USE_WEIGHTS: boolean whether to use weighted loss calculation based on support of each class
+- SPLITS_PP: number of stratified splits for each subject in per-participant evaluation
+- SIZE_PP:
+- WEIGHTED: boolean whether to use weighted loss calculation based on support of each class
 - ADJ_LR: boolean whether to adjust learning rate if no improvement
+- LR_SCHEDULER: type of learning rate scheduler to employ ('step_lr', 'reduce_lr_on_plateau')
+- LR_STEP: step size of learning rate scheduler (patience if plateau).
+- LR_DECAY: decay factor of learning rate scheduler.
 - EARLY_STOPPING: boolean whether to stop the network training early if no improvement 
-- ADJ_LR_PATIENCE: patience (i.e. number of epochs) after which learning is adjusted if no improvement
 - ES_PATIENCE: patience (i.e. number of epochs) after which network training is stopped if no improvement
 """
 
@@ -120,17 +131,19 @@ OPTIMIZER = 'adam'
 LR = 1e-4
 WEIGHT_DECAY = 1e-6
 WEIGHTS_INIT = 'xavier_normal'
-LOSS = 'label_smoothing'
-LS_SMOOTHING = 0.0
+LOSS = 'cross_entropy'
+SMOOTHING = 0.0
 GPU = 'cuda:0'
 SPLITS_KFOLD = 5
-SPLITS_SSS = 2
-SIZE_SSS = 0.6
-USE_WEIGHTS = True
+SPLITS_PP = 5
+SIZE_PP = 0.6
+WEIGHTED = False
 ADJ_LR = False
+LR_SCHEDULER = 'reduce_lr_on_plateau'
+LR_STEP = 10
+LR_DECAY = 0.9
 EARLY_STOPPING = False
-ADJ_LR_PATIENCE = 5
-ES_PATIENCE = 5
+ES_PATIENCE = 10
 
 """
 LOGGING OPTIONS:
@@ -144,12 +157,12 @@ LOGGING OPTIONS:
 """
 
 LOGGING = True
-PRINT_COUNTS = False
-VERBOSE = False
+PRINT_COUNTS = True
+VERBOSE = True
 PRINT_FREQ = 100
-SAVE_TEST_PREDICTIONS = False
-SAVE_MODEL = False
-SAVE_GRADIENT_PLOT = False
+SAVE_TEST_PREDICTIONS = True
+SAVE_MODEL = True
+SAVE_GRADIENT_PLOT = True
 
 
 def main(args):
@@ -273,74 +286,157 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', default=DATASET, type=str,
-                        help='dataset to be used (rwhar, sbhar, wetlab or hhar)')
-    parser.add_argument('--pred_type', default=PRED_TYPE, type=str,
-                        help='prediction type for wetlab dataset (actions or tasks)')
-    parser.add_argument('--save_test_preds', default=SAVE_TEST_PREDICTIONS, type=bool, help='save predictions in separate file')
-    parser.add_argument('--logging', default=LOGGING, type=bool, help='log terminal output into text file')
-    parser.add_argument('--verbose', default=VERBOSE, type=bool, help='verbose training output (batchwise)')
-    parser.add_argument('--print_freq', default=PRINT_FREQ, type=int,
-                        help='if verbose, frequency of which is printed (batches)')
-    parser.add_argument('--print_counts', default=PRINT_COUNTS, type=bool,
-                        help='print class distribution of train and validation set after epochs')
-    parser.add_argument('--save_gradient_plot', default=SAVE_GRADIENT_PLOT, type=bool, help='save gradient flow plot')
-    parser.add_argument('--include_null', default=INCLUDE_NULL, type=bool,
-                        help='include null class (if dataset has one) in training/ prediction')
-    parser.add_argument('--cutoff_type', default=CUTOFF_TYPE, type=str, help='type how dataset is split (subject, percentage or record)')
-    parser.add_argument('--cutoff_train', default=CUTOFF_TRAIN, type=int,
-                        help='cutoff point for train dataset. See documentation for further explanations.')
-    parser.add_argument('--cutoff_valid', default=CUTOFF_VALID, type=int,
-                        help='cutoff point for validation dataset. See documentation for further explanations.')
-    parser.add_argument('--splits_kfold', default=SPLITS_KFOLD, type=int, help='no. splits for k-fold cv')
-    parser.add_argument('--splits_sss', default=SPLITS_SSS, type=int, help='no. splits for per-participant eval')
-    parser.add_argument('--size_sss', default=SIZE_SSS, type=float,
-                        help='size of validation set in per-participant eval')
-    parser.add_argument('--network', default=NETWORK, type=str, help='network to be used (e.g. deepconvlstm)')
-    parser.add_argument('--valid_type', default=VALID_TYPE, type=str,
-                        help='validation type to be used (per-participant, cross-participant, train-valid-split, k-fold)')
-    parser.add_argument('--seed', default=SEED, type=int, help='seed to be employed')
-    parser.add_argument('--epochs', default=EPOCHS, type=int, help='no. epochs to use during training')
-    parser.add_argument('--batch_size', default=BATCH_SIZE, type=int, help='batch size to use during training')
-    parser.add_argument('--means_and_stds', default=MEANS_AND_STDS, type=bool,
-                        help='append means and stds of columns to dataset')
-    parser.add_argument('--sw_length', default=SW_LENGTH, type=float, help='length of sliding window')
-    parser.add_argument('--sw_unit', default=SW_UNIT, type=str, help='sliding window unit used (units, seconds)')
-    parser.add_argument('--sw_overlap', default=SW_OVERLAP, type=float, help='overlap employed between sliding windows')
-    parser.add_argument('--weights_init', default=WEIGHTS_INIT, type=str,
-                        help='weight initialization method used (normal, orthogonal, xavier_uniform, xavier_normal, kaiming_uniform, kaiming_normal)')
-    parser.add_argument('--batch_norm', default=BATCH_NORM, type=bool,
-                        help='use batch normalisation after each convolution')
-    parser.add_argument('--reduce_layer', default=REDUCE_LAYER, type=bool, help='use reduce layer after convolutions')
-    parser.add_argument('--reduce_layer_output', default=REDUCE_LAYER_OUTPUT, type=bool,
-                        help='size of reduce layer output')
-    parser.add_argument('--pooling', default=POOLING, type=bool, help='apply pooling after convolutions')
-    parser.add_argument('--pool_type', default=POOL_TYPE, type=str, help='type of pooling applied (max, average)')
-    parser.add_argument('--pool_kernel_width', default=POOL_KERNEL_WIDTH, help='size of pooling kernel')
-    parser.add_argument('--use_weights', default=USE_WEIGHTS, type=bool, help='use weighted loss')
-    parser.add_argument('--filter_width', default=FILTER_WIDTH, type=int, help='filter size (convolutions)')
-    parser.add_argument('--drop_prob', default=DROP_PROB, type=float, help='dropout probability before classifier')
-    parser.add_argument('--optimizer', default=OPTIMIZER, type=str, help='optimizer to be used (adam, rmsprop, adadelta)')
-    parser.add_argument('--loss', default=LOSS, type=str, help='loss to be used (e.g. cross_entropy)')
-    parser.add_argument('--ls_smoothing', default=LS_SMOOTHING, type=float, help='degree of label smoothing (if employed)')
-    parser.add_argument('--lr', default=LR, type=float, help='learning rate to be used')
-    parser.add_argument('--gpu', default=GPU, type=str, help='gpu to be used (e.g. cuda:1)')
-    parser.add_argument('--adj_lr', default=ADJ_LR, type=bool, help='adjust learning rate')
-    parser.add_argument('--adj_lr_patience', default=ADJ_LR_PATIENCE, type=int,
-                        help='patience when learning rate is to be adjusted (e.g. after 5 epochs of no improvement)')
-    parser.add_argument('--early_stopping', default=EARLY_STOPPING, type=bool, help='employ early stopping')
-    parser.add_argument('--es_patience', default=ES_PATIENCE, type=int,
-                        help='patience for early stopping (e.g. after 5 epochs of no improvement)')
-    parser.add_argument('--weight_decay', default=WEIGHT_DECAY, type=float, help='weight decay to be used')
-    parser.add_argument('--nb_units_lstm', default=NB_UNITS_LSTM, type=int,
-                        help='number of units within each LSTM layer')
-    parser.add_argument('--nb_layers_lstm', default=NB_LAYERS_LSTM, type=int, help='number of layers in LSTM')
-    parser.add_argument('--nb_conv_blocks', default=NB_CONV_BLOCKS, type=int, help='number of convolution blocks')
-    parser.add_argument('--conv_block_type', default=CONV_BLOCK_TYPE, type=str,
-                        help='type of convolution blocks used (normal, skip, fixup)')
-    parser.add_argument('--nb_filters', default=NB_FILTERS, type=int, help='number of convolution filters')
-    parser.add_argument('--dilation', default=DILATION, type=int, help='dilation applied in convolution filters')
-    parser.add_argument('--save_model', default=SAVE_MODEL, type=bool, help='whether to save the trained model as a pickle file')
+    # Flags
+    parser.add_argument('--save_test_preds', default=SAVE_TEST_PREDICTIONS, action='store_true',
+                        help='Flag indicating to save predictions in separate file')
+    parser.add_argument('--logging', default=LOGGING, action='store_true',
+                        help='Flag indicating to log terminal output into text file')
+    parser.add_argument('--verbose', default=VERBOSE, action='store_true',
+                        help='Flag indicating to have verbose training output (batchwise)')
+    parser.add_argument('--print_counts', default=PRINT_COUNTS, action='store_true',
+                        help='Flag indicating to print class distribution of train and validation set after epochs')
+    parser.add_argument('--save_gradient_plot', default=SAVE_GRADIENT_PLOT, action='store_true',
+                        help='Flag indicating to save gradient flow plot')
+    parser.add_argument('--include_null', default=INCLUDE_NULL, action='store_true',
+                        help='Flag indicating to include null class (if dataset has one) in training/ prediction')
+    parser.add_argument('--means_and_stds', default=MEANS_AND_STDS, action='store_true',
+                        help='Flag indicating to append means and stds of columns to dataset')
+    parser.add_argument('--batch_norm', default=BATCH_NORM, action='store_true',
+                        help='Flag indicating to use batch normalisation after each convolution')
+    parser.add_argument('--reduce_layer', default=REDUCE_LAYER, action='store_true',
+                        help='Flag indicating to use reduce layer after convolutions')
+    parser.add_argument('--weighted', default=WEIGHTED, action='store_true',
+                        help='Flag indicating to use weighted loss')
+    parser.add_argument('--pooling', default=POOLING, action='store_true',
+                        help='Flag indicating to apply pooling after convolutions')
+    parser.add_argument('--adj_lr', default=ADJ_LR, action='store_true',
+                        help='Flag indicating to adjust learning rate')
+    parser.add_argument('--early_stopping', default=EARLY_STOPPING, action='store_true',
+                        help='Flag indicating to employ early stopping')
+    parser.add_argument('--save_model', default=SAVE_MODEL, action='store_true',
+                        help='Flag indicating to save the trained model as a pickle file')
+
+    # Strings
+    parser.add_argument('-d', '--dataset', default=DATASET, type=str,
+                        help='Dataset to be used. Options: rwhar, sbhar, wetlab, hhar or opportunity_ordonez. '
+                             'Default: rwhar')
+    parser.add_argument('-co', '--cutoff_type', default=CUTOFF_TYPE, type=str,
+                        help='Type how dataset is split. Options: subject, percentage or record. '
+                        'Default: subject')
+    parser.add_argument('-p', '--pred_type', default=PRED_TYPE, type=str,
+                        help='(If applicable) prediction type for dataset. See dataset documentation for options. '
+                        'Default: gestures')
+    parser.add_argument('-n', '--network', default=NETWORK, type=str,
+                        help='Network to be used. Options: deepconvlstm. '
+                             'Default: deepconvlstm')
+    parser.add_argument('-vt', '--valid_type', default=VALID_TYPE, type=str,
+                        help='Validation type to be used. Options: per-participant, cross-participant, '
+                             'train-valid-split, k-fold). '
+                             'Default: cross-participant')
+    parser.add_argument('-swu', '--sw_unit', default=SW_UNIT, type=str,
+                        help='sliding window unit used. Options: units, seconds.'
+                             'Default: units')
+    parser.add_argument('-wi', '--weights_init', default=WEIGHTS_INIT, type=str,
+                        help='weight initialization method used. Options: normal, orthogonal, xavier_uniform, '
+                             'xavier_normal, kaiming_uniform, kaiming_normal. '
+                             'Default: xavier_normal')
+    parser.add_argument('-pt', '--pool_type', default=POOL_TYPE, type=str,
+                        help='type of pooling applied. Options: max, average. '
+                             'Default: max')
+    parser.add_argument('-o', '--optimizer', default=OPTIMIZER, type=str,
+                        help='Optimizer to be used. Options: adam, rmsprop, adadelta.'
+                             'Default: adam')
+    parser.add_argument('-l', '--loss', default=LOSS, type=str,
+                        help='Loss to be used. Options: cross_entropy, maxup.'
+                             'Default: cross-entropy')
+    parser.add_argument('-g', '--gpu', default=GPU, type=str,
+                        help='GPU to be used. Default: cuda:1')
+    parser.add_argument('-lrs', '--lr_scheduler', default=LR_SCHEDULER, type=str,
+                        help='Learning rate scheduler to use. Options: step_lr, reduce_lr_on_plateau. '
+                             'Default: step_lr')
+    parser.add_argument('-cbt', '--conv_block_type', default=CONV_BLOCK_TYPE, type=str,
+                        help='type of convolution blocks used. Options: normal, skip, fixup.'
+                             'Default: normal')
+
+    parser.add_argument('-pf', '--print_freq', default=PRINT_FREQ, type=int,
+                        help='If verbose, frequency of which is printed (batches).'
+                             'Default: 100')
+    parser.add_argument('-cot', '--cutoff_train', default=CUTOFF_TRAIN, type=int,
+                        help='Cutoff point for train dataset. See documentation for further explanations. '
+                             'Default: 10')
+    parser.add_argument('-cov', '--cutoff_valid', default=CUTOFF_VALID, type=int,
+                        help='Cutoff point for validation dataset. See documentation for further explanations. '
+                             'Default: 12')
+    parser.add_argument('-sskf', '--splits_kfold', default=SPLITS_KFOLD, type=int,
+                        help='No. splits for k-fold cv. '
+                             'Default: 5')
+    parser.add_argument('-sppp', '--splits_pp', default=SPLITS_PP, type=int,
+                        help='No. splits for per-participant eval.'
+                             'Default: 5')
+    parser.add_argument('-s', '--seed', default=SEED, type=int,
+                        help='Seed to be employed. '
+                             'Default: 1')
+    parser.add_argument('-e', '--epochs', default=EPOCHS, type=int,
+                        help='No. epochs to use during training.'
+                             'Default: 30')
+    parser.add_argument('-bs', '--batch_size', default=BATCH_SIZE, type=int,
+                        help='Batch size to use during training.'
+                             'Default: 100')
+    parser.add_argument('-rlo', '--reduce_layer_output', default=REDUCE_LAYER_OUTPUT, type=int,
+                        help='Size of reduce layer output. '
+                             'Default: 8')
+    parser.add_argument('-pkw', '--pool_kernel_width', default=POOL_KERNEL_WIDTH, type=int,
+                        help='Size of pooling kernel.'
+                             'Default: 2')
+    parser.add_argument('-fw', '--filter_width', default=FILTER_WIDTH, type=int,
+                        help='Filter size (convolutions).'
+                             'Default: 11')
+    parser.add_argument('-esp', '--es_patience', default=ES_PATIENCE, type=int,
+                        help='Patience for early stopping (e.g. after 10 epochs of no improvement). '
+                             'Default: 10')
+    parser.add_argument('-nbul', '--nb_units_lstm', default=NB_UNITS_LSTM, type=int,
+                        help='Number of units within each LSTM layer. '
+                             'Default: 128')
+    parser.add_argument('-nbll', '--nb_layers_lstm', default=NB_LAYERS_LSTM, type=int,
+                        help='Number of layers in LSTM.'
+                             'Default: 1')
+    parser.add_argument('-nbcb', '--nb_conv_blocks', default=NB_CONV_BLOCKS, type=int,
+                        help='Number of convolution blocks. '
+                             'Default: 2')
+    parser.add_argument('-nbf', '--nb_filters', default=NB_FILTERS, type=int,
+                        help='Number of convolution filters.'
+                             'Default: 64')
+    parser.add_argument('-dl', '--dilation', default=DILATION, type=int,
+                        help='Dilation applied in convolution filters.'
+                             'Default: 1')
+    parser.add_argument('-lrss', '--lr_step', default=LR_STEP, type=int,
+                        help='Period of learning rate decay (patience if plateau scheduler).'
+                             'Default: 10')
+
+    parser.add_argument('-spp', '--size_pp', default=SIZE_PP, type=float,
+                        help='Size of validation set in per-participant eval.'
+                             'Default: 0.6')
+    parser.add_argument('-swl', '--sw_length', default=SW_LENGTH, type=float,
+                        help='Length of sliding window. '
+                             'Default: 50')
+    parser.add_argument('-swo', '--sw_overlap', default=SW_OVERLAP, type=int,
+                        help='Overlap employed between sliding windows.'
+                             'Default: 60')
+    parser.add_argument('-dp', '--drop_prob', default=DROP_PROB, type=float,
+                        help='Dropout probability.'
+                             'Default 0.5')
+    parser.add_argument('-sm', '--smoothing', default=SMOOTHING, type=float,
+                        help='Degree of label smoothing.'
+                             'Default: 0.0')
+    parser.add_argument('-lr', '--learning_rate', default=LR, type=float,
+                        help='Learning rate to be used. '
+                             'Default: 1e-04')
+    parser.add_argument('-wd', '--weight_decay', default=WEIGHT_DECAY, type=float,
+                        help='Weight decay to be used. '
+                             'Default: 1e-06')
+    parser.add_argument('-lrsd', '--lr_decay', default=LR_DECAY, type=float,
+                        help='Multiplicative factor of learning rate decay. '
+                             'Default: 0.9')
 
     args = parser.parse_args()
 

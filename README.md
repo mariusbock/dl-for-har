@@ -1,6 +1,6 @@
-# Improving Deep Learning for HAR with shallow LSTMs (ISWC 21' Note paper)
+# Improving Deep Learning for HAR with shallow LSTMs (ISWC 21' best-paper award)
 
-This is the official GitHub page of the note paper publication "Improving Deep Learning for HAR with shallow LSTMs" presented at the International Symposium on Wearable Computers 21' (ISWC 21'). [[cite our work]](#cite)
+This is the official GitHub page of the **best-paper award-winning** publication "Improving Deep Learning for HAR with shallow LSTMs" presented at the International Symposium on Wearable Computers 21' (ISWC 21'). [[cite our work]](#cite)
 
 ## Abstract
 Recent studies in Human Activity Recognition (HAR) have shown that Deep Learning methods are able to outperform classical Machine Learning algorithms. One popular Deep Learning architecture in HAR is the DeepConvLSTM. In this paper we propose to alter the DeepConvLSTM architecture to employ a 1-layered instead of a 2-layered LSTM. We validate our architecture change on 5 publicly available HAR datasets by comparing the predictive performance with and without the change employing varying hidden units within the LSTM layer(s). Results show that across all datasets, our architecture consistently improves on the original one: Recognition performance increases up to 11.7% for the F1-score,and our architecture significantly decreases the amount of learnable parameters. This improvement over DeepConvLSTM decreases training time by as much as 48%. Our results stand in contrast to the belief that one needs at least a 2-layered LSTM when dealing with sequential data. Based on our results we argue that said claim might not be applicable to sensor-based HAR.
@@ -52,6 +52,14 @@ Results were obtained on the Wetlab [[4]](#4), RWHAR [[6]](#6), SBHAR [[2]](#2) 
 - main.py: main script which is to be run in order to commence experiments
 - Results.xlsx: excel file containing all expererimental results presented in the paper
 
+## Installing requirements
+
+Please install the required python packages as noted in the ```requirements.txt```. We recommend using ```pip``` by running:
+
+```
+pip install -r requirements.txt
+```
+
 ## Datasets
 
 The datasets (raw and preprocessed data) used during experiments can be either downloaded via this link: 
@@ -65,7 +73,21 @@ The datasets need to be put in a seperate '/data' directory within the main dire
 
 ### Dataset creation
 
-Coming soon
+In order to (re-)create the datasets used within these experiments, please additionally install the modified version of ```PyAV``` by Philipp Scholl (https://github.com/pscholl/PyAV). 
+
+- For Linux: 
+```
+cd data_processing
+git clone https://github.com/pscholl/PyAV
+sudo apt-get install libx264-dev
+sudo apt-get install libavformat-dev
+sudo apt-get install libavdevice-dev
+cd PyAV
+./scripts/build-deps
+make
+```
+
+Once installed, you can run the ```dataset_creation.py``` file within the ```data_processing``` directory and it will create all relevant datasets and save them to the ```data``` directory within the root directory of this project.
 
 ## (Re-)running experiments
 
@@ -79,18 +101,6 @@ Note that within the log files accuracy, precision, recall and F1-score inbetwee
 
 The results excel sheet (results.xlsx) contains all results mentioned within the paper and GitHub as well as aggregated information about the standard deviation across runs, per-class results and standard deviation across subjects.
 
-## Installing PyAV
-- For Linux: 
-```
-git clone https://github.com/pscholl/PyAV
-sudo apt-get install libx264-dev
-sudo apt-get install libavformat-dev
-sudo apt-get install libavdevice-dev
-conda install cython
-cd PyAV
-./scripts/build-deps
-make
-```
 ## Citation
 <a id="cite">Cite this work as: </a><br/> 
 Marius Bock, Alexander Hölzemann, Michael Moeller, and Kristof Van Laerhoven. 2021. Improving Deep Learning for HAR with shallow LSTMs. In 2021 International Symposium on Wearable Computers (ISWC ’21), September 21–26, 2021, Virtual, USA. ACM, New York, NY, USA, 6 pages. https://doi.org/10.1145/3460421.3480419

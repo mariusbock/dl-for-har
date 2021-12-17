@@ -1,3 +1,10 @@
+##################################################
+# All functions related to evaluating training and testing results
+##################################################
+# Author: Marius Bock
+# Email: marius.bock(at)uni-siegen.de
+##################################################
+
 import matplotlib.pyplot as plt
 import numpy as np
 import itertools
@@ -80,6 +87,26 @@ def plot_confusion_matrix(input, target_names, title='Confusion matrix', cmap=No
 
 
 def evaluate_participant_scores(participant_scores, gen_gap_scores, input_cm, class_names, nb_subjects, filepath, filename, args):
+    """
+    Function which prints evaluation metrics of each participant, overall average and saves confusion matrix
+
+    :param participant_scores: numpy array
+        Array containing all results
+    :param gen_gap_scores:
+        Array containing generalization gap results
+    :param input_cm: confusion matrix
+        Confusion matrix of overall results
+    :param class_names: list of strings
+        Class names
+    :param nb_subjects: int
+        Number of subjects in dataset
+    :param filepath: str
+        Directory where to save plots to
+    :param filename: str
+        Name of plot
+    :param args: dict
+        Overall settings dict
+    """
     print('\nPREDICTION RESULTS')
     print('-------------------')
     print('Average results')

@@ -1,4 +1,12 @@
-import math
+##################################################
+# All functions related to training a model
+##################################################
+# Author: Marius Bock
+# Email: marius.bock(at)uni-siegen.de
+# Author: Michael Moeller
+# Email: michael.moeller(at)uni-siegen.de
+##################################################
+
 import os
 
 from sklearn.metrics import precision_score, recall_score, f1_score, jaccard_score
@@ -7,7 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import torch
-from sklearn.utils import class_weight
+from sklearn.utils.class_weight import compute_class_weight
 from torch import nn
 from torch.utils.data import DataLoader
 
@@ -21,8 +29,10 @@ def init_weights(network):
     Weight initialization of network (initialises all LSTM, Conv2D and Linear layers according to weight_init parameter
     of network.
 
-    :param network: network of which weights are to be initialised
-    :return: network with initialised weights
+    :param network: pytorch model
+        Network of which weights are to be initialised
+    :return: pytorch model
+        Network with initialised weights
     """
     for m in network.modules():
         # normal convblock and skip convblock initialisation
@@ -140,6 +150,16 @@ class Maxup(torch.nn.Module):
 
 
 def myNoiseAdditionAugmenter(x, y):
+    """
+    Noise augmenter for maxup loss
+
+    :param x: numpy array
+        Features
+    :param y: numpy array
+        Labels
+    :return: numpy array, numpy array
+        Features with added noise and labels
+    """
     sigma = 0.5
     return x + sigma*torch.randn_like(x), y
 
@@ -148,8 +168,8 @@ def plot_grad_flow(network):
     """
     Function which plots the average gradient of a network.
 
-    :param network: network used to obtain gradient
-    :return: plot containing the plotted average gradient
+    :param network: pytorch model
+        Network used to obtain gradient
     """
     named_parameters = network.named_parameters()
     ave_grads = []
@@ -172,25 +192,12 @@ def init_loss(config):
     """
     Initialises an loss object for a given network.
 
+    :param config: dict
+        General setting dictionary
     :return: loss object
     """
     if config.loss == 'cross_entropy':
-        criterion = nn.CrossEntropyLoss()
-    elif config.loss == 'label_smoothing':
-        class LabelSmoothingLoss(nn.Module):
-            def __init__(self, smoothing=0.0):
-                super(LabelSmoothingLoss, self).__init__()
-                self.smoothing = smoothing
-
-            def forward(self, prediction, target):
-                assert 0 <= self.smoothing < 1
-                neglog_softmaxPrediction = -prediction.log_softmax(dim=1)
-
-                with torch.no_grad():
-                    smoothedLabels = self.smoothing / (prediction.size(1) - 1) * torch.ones_like(prediction)
-                    smoothedLabels.scatter_(1, target.data.unsqueeze(1), 1 - self.smoothing)
-                return torch.mean(torch.sum(smoothedLabels * neglog_softmaxPrediction, dim=1))
-        criterion = LabelSmoothingLoss(smoothing=config.ls_smoothing)
+        criterion = nn.CrossEntropyLoss(label_smoothing=config.smoothing)
     elif config.loss == 'maxup':
         return None
     return criterion
@@ -200,35 +207,66 @@ def init_optimizer(network, config):
     """
     Initialises an optimizer object for a given network.
 
-    :param network: network for which optimizer and loss are to be initialised
+    :param network: pytorch model
+        Network for which optimizer and loss are to be initialised
+    :param config: dict
+        General setting dictionary
     :return: optimizer object
     """
     # define optimizer and loss
     if config.optimizer == 'adadelta':
-        opt = torch.optim.Adadelta(network.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+        opt = torch.optim.Adadelta(network.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
     elif config.optimizer == 'adam':
-        opt = torch.optim.Adam(network.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+        opt = torch.optim.Adam(network.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
     elif config.optimizer == 'rmsprop':
-        opt = torch.optim.RMSprop(network.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+        opt = torch.optim.RMSprop(network.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
     return opt
 
 
-def train(train_features, train_labels, val_features, val_labels, network, optimizer, loss, config, log_date, log_timestamp):
+def init_scheduler(optimizer, config):
+    """
+
+    :param optimizer: optimizer object
+        Optimizer object used during training
+    :param config: dict
+        General setting dictionary
+    :return:
+    """
+    if config.lr_scheduler == 'step_lr':
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, config.lr_step, config.lr_decay)
+    elif config.lr_scheduler == 'reduce_lr_on_plateau':
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=config.lr_step, factor=config.lr_decay)
+    return scheduler
+
+
+def train(train_features, train_labels, val_features, val_labels, network, optimizer, loss, config, log_date, log_timestamp, lr_scheduler=None):
     """
     Method to train a PyTorch network.
 
-    :param train_features: training features
-    :param train_labels: training labels
-    :param val_features: validation features
-    :param val_labels: validation labels
-    :param network: DeepConvLSTM network object
+    :param train_features: numpy array
+        Training features
+    :param train_labels: numpy array
+        Training labels
+    :param val_features: numpy array
+        Validation features
+    :param val_labels: numpy array
+        Validation labels
+    :param network: pytorch model
+        DeepConvLSTM network object
     :param optimizer: optimizer object
+        Optimizer object
     :param loss: loss object
-    :param config: config file which contains all training and hyperparameter settings
-    :param log_date: date used for logging
-    :param log_timestamp: timestamp used for logging
-
-    :return three numpy arrays containing validation, training and test predictions (predictions, gt labels)
+        Loss object
+    :param config: dict
+        Config file which contains all training and hyperparameter settings
+    :param log_date: string
+        Date used for logging
+    :param log_timestamp: string
+        Timestamp used for logging
+    :param lr_scheduler: scheduler object, default: None
+        Learning rate scheduler object
+    :return pytorch model, numpy array, numpy array
+        Trained network and training and validation predictions with ground truth
     """
 
     # prints the number of learnable parameters in the network
@@ -241,17 +279,18 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
     network.train()
 
     # if weighted loss chosen, calculate weights based on training dataset; else each class is weighted equally
-    if config['use_weights']:
-        class_weights = class_weight.compute_class_weight('balanced', classes=np.unique(train_labels + 1), y=train_labels + 1)
+    if config['weighted']:
+        class_weights = torch.from_numpy(
+            compute_class_weight('balanced', classes=np.unique(train_labels + 1), y=train_labels + 1)).float()
         if config['loss'] == 'cross_entropy':
-            loss.weights = class_weights
+            loss.weight = class_weights.cuda()
         print('Applied weighted class weights: ')
         print(class_weights)
     else:
-        class_weights = class_weight.compute_class_weight(None, classes=np.unique(train_labels + 1), y=train_labels + 1)
+        class_weights = torch.from_numpy(
+            compute_class_weight(None, classes=np.unique(train_labels + 1), y=train_labels + 1)).float()
         if config['loss'] == 'cross_entropy':
-            loss.weights = class_weights
-
+            loss.weight = class_weights.cuda()
 
     # initialize optimizer and loss
     opt, criterion = optimizer, loss
@@ -261,9 +300,11 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
 
     # initialize training and validation dataset, define DataLoaders
     dataset = torch.utils.data.TensorDataset(torch.from_numpy(train_features), torch.from_numpy(train_labels))
-    trainloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True)
-    dataset = torch.utils.data.TensorDataset(torch.from_numpy(val_features).float(), torch.from_numpy(val_labels))
-    valloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=False)
+    trainloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True,
+                             worker_init_fn=np.random.seed(int(config['seed'])))
+    dataset = torch.utils.data.TensorDataset(torch.from_numpy(val_features), torch.from_numpy(val_labels))
+    valloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=False,
+                           worker_init_fn=np.random.seed(int(config['seed'])))
 
     # counters and objects used for early stopping and learning rate adjustment
     best_loss = np.inf
@@ -273,7 +314,6 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
     best_val_preds = None
     best_train_preds = None
     early_stop = False
-    lr_pt_counter = 0
     es_pt_counter = 0
 
     # training loop; iterates through epochs
@@ -375,16 +415,25 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
 
             # print epoch evaluation results for train and validation dataset
             print("EPOCH: {}/{}".format(e + 1, config['epochs']),
-                  "Train Loss: {:.4f}".format(np.mean(train_losses)),
-                  "Train Acc: {:.4f}".format(jaccard_score(train_gt, train_preds, average='macro')),
-                  "Train Prec: {:.4f}".format(precision_score(train_gt, train_preds, average='macro')),
-                  "Train Rcll: {:.4f}".format(recall_score(train_gt, train_preds, average='macro')),
-                  "Train F1: {:.4f}".format(f1_score(train_gt, train_preds, average='macro')),
-                  "Val Loss: {:.4f}".format(np.mean(val_losses)),
-                  "Val Acc: {:.4f}".format(jaccard_score(val_gt, val_preds, average='macro')),
-                  "Val Prec: {:.4f}".format(precision_score(val_gt, val_preds, average='macro')),
-                  "Val Rcll: {:.4f}".format(recall_score(val_gt, val_preds, average='macro')),
-                  "Val F1: {:.4f}".format(f1_score(val_gt, val_preds, average='macro')))
+                  "\nTrain Loss: {:.4f}".format(np.mean(train_losses)),
+                  "Train Acc (M): {:.4f}".format(jaccard_score(train_gt, train_preds, average='macro')),
+                  "Train Prc (M): {:.4f}".format(precision_score(train_gt, train_preds, average='macro')),
+                  "Train Rcl (M): {:.4f}".format(recall_score(train_gt, train_preds, average='macro')),
+                  "Train F1 (M): {:.4f}".format(f1_score(train_gt, train_preds, average='macro')),
+                  "Train Acc (W): {:.4f}".format(jaccard_score(train_gt, train_preds, average='weighted')),
+                  "Train Prc (W): {:.4f}".format(precision_score(train_gt, train_preds, average='weighted')),
+                  "Train Rcl (W): {:.4f}".format(recall_score(train_gt, train_preds, average='weighted')),
+                  "Train F1 (W): {:.4f}".format(f1_score(train_gt, train_preds, average='weighted')),
+                  "\nValid Loss: {:.4f}".format(np.mean(val_losses)),
+                  "Valid Acc (M): {:.4f}".format(jaccard_score(val_gt, val_preds, average='macro')),
+                  "Valid Prc (M): {:.4f}".format(precision_score(val_gt, val_preds, average='macro')),
+                  "Valid Rcl (M): {:.4f}".format(recall_score(val_gt, val_preds, average='macro')),
+                  "Valid F1 (M): {:.4f}".format(f1_score(val_gt, val_preds, average='macro')),
+                  "Valid Acc (W): {:.4f}".format(jaccard_score(val_gt, val_preds, average='weighted')),
+                  "Valid Prc (W): {:.4f}".format(precision_score(val_gt, val_preds, average='weighted')),
+                  "Valid Rcl (W): {:.4f}".format(recall_score(val_gt, val_preds, average='weighted')),
+                  "Valid F1 (W): {:.4f}".format(f1_score(val_gt, val_preds, average='weighted'))
+                  )
 
             # if chosen, print the value counts of the predicted labels for train and validation dataset
             if config['print_counts']:
@@ -397,22 +446,19 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
                 print('Predicted Val Labels: ')
                 print(np.vstack((ii_val, y_val[ii_val])).T)
 
-        # if adjust learning rate is enabled
-        if config['adj_lr'] or config['early_stopping']:
+        # adjust learning rate if enabled
+        if config['adj_lr']:
+            if config['lr_scheduler'] == 'reduce_lr_on_plateau':
+                lr_scheduler.step(np.mean(val_losses))
+            else:
+                lr_scheduler.step()
+
+        # employ early stopping if employed
+        if config['early_stopping']:
             if best_loss < np.mean(val_losses):
-                lr_pt_counter += 1
                 es_pt_counter += 1
-
-                # adjust learning rate check
-                if lr_pt_counter >= config['adj_lr_patience'] and config['adj_lr']:
-                    config['lr'] *= 0.1
-                    for param_group in opt.param_groups:
-                        param_group['lr'] = param_group['lr'] * 0.1
-                    print('Changing learning rate to {} since no loss improvement over {} epochs.'
-                          .format(config['lr'], str(lr_pt_counter)))
-
                 # early stopping check
-                if es_pt_counter >= config['es_patience'] and config['early_stopping']:
+                if es_pt_counter >= config['es_patience']:
                     print('Stopping training early since no loss improvement over {} epochs.'
                           .format(str(es_pt_counter)))
                     early_stop = True
@@ -430,7 +476,6 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
                           "Val F1: {:.4f}".format(f1_score(val_gt, best_val_preds, average='macro')))
 
             else:
-                lr_pt_counter = 0
                 es_pt_counter = 0
                 best_network = network
                 best_loss = np.mean(val_losses)
@@ -464,12 +509,18 @@ def predict(test_features, test_labels, network, config, log_date, log_timestamp
     """
     Method that applies a trained network to obtain predictions on a test dataset. If selected, saves predictions.
 
-    :param test_features: test features
-    :param test_labels: test labels
-    :param network: trained network object
-    :param config: config file which contains all training and hyperparameter settings
-    :param log_date: date used for saving predictions
-    :param log_timestamp: timestamp used for saving predictions
+    :param test_features: numpy array
+        Test features
+    :param test_labels: numpy array
+        Test labels
+    :param network: pytorch model
+        Trained network object
+    :param config: dict
+        Config file which contains all training and hyperparameter settings
+    :param log_date: string
+        Date used for saving predictions
+    :param log_timestamp: string
+        Timestamp used for saving predictions
     """
     # set network to eval mode
     network.eval()
@@ -481,8 +532,8 @@ def predict(test_features, test_labels, network, config, log_date, log_timestamp
     dataset = torch.utils.data.TensorDataset(torch.from_numpy(test_features).float(), torch.from_numpy(test_labels))
     testloader = DataLoader(dataset,
                             batch_size=config['batch_size'],
-                            num_workers=2,
                             shuffle=False,
+                            worker_init_fn=np.random.seed(int(config['seed']))
                             )
 
     with torch.no_grad():
@@ -516,4 +567,4 @@ def predict(test_features, test_labels, network, config, log_date, log_timestamp
 
     if config['save_test_preds']:
         mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
-        np.save(os.path.join('logs', log_date, log_timestamp, 'test_preds.npy'), test_output)
+        np.save(os.path.join('logs', log_date, log_timestamp, 'test_preds.npy'), test_output.cpu().numpy())

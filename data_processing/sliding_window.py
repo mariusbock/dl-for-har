@@ -1,15 +1,25 @@
+##################################################
+# All functions related to applying sliding window on a dataset
+##################################################
+# Author: Marius Bock
+# Email: marius.bock(at)uni-siegen.de
+##################################################
+
 import numpy as np
-import pandas as pd
 
 
 def sliding_window_seconds(data, length_in_seconds=1, sampling_rate=50, overlap_ratio=None):
     """
     Return a sliding window measured in seconds over a data array.
 
-    :param data: input array, can be numpy or pandas dataframe
-    :param length_in_seconds: window length as seconds
-    :param sampling_rate: sampling rate in hertz as integer value
-    :param overlap_ratio: overlap is meant as percentage and should be an integer value
+    :param data: dataframe
+        Input array, can be numpy or pandas dataframe
+    :param length_in_seconds: int, default: 1
+        Window length as seconds
+    :param sampling_rate: int, default: 50
+        Sampling rate in hertz as integer value
+    :param overlap_ratio: int, default: None
+        Overlap is meant as percentage and should be an integer value
     :return: tuple of windows and indices
     """
     windows = []
@@ -33,10 +43,14 @@ def sliding_window_samples(data, samples_per_window, overlap_ratio):
     """
     Return a sliding window measured in number of samples over a data array.
 
-    :param data: input array, can be numpy or pandas dataframe
-    :param samples_per_window: window length as number of samples per window
-    :param overlap_ratio: overlap is meant as percentage and should be an integer value
-    :return: tuple of windows and indices
+    :param data: dataframe
+        Input array, can be numpy or pandas dataframe
+    :param samples_per_window: int
+        Window length as number of samples per window
+    :param overlap_ratio: int
+        Overlap is meant as percentage and should be an integer value
+    :return: dataframe, list
+        Tuple of windows and indices
     """
     windows = []
     indices = []

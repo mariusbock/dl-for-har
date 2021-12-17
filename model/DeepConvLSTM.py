@@ -1,17 +1,21 @@
-###################################################################
-# File Name: DeepConvLSTM_PT.py
+##################################################
+# Pytorch implementation (with extensions) of the DeepConvLSTM as proposed by by Ordonez and Roggen (https://www.mdpi.com/1424-8220/16/1/115)
+##################################################
 # Author: Marius Bock
-# mail: marius.bock@uni-siegen.de
-###################################################################
+# Email: marius.bock(at)uni-siegen.de
+##################################################
+
 from torch import nn
 import torch
 import warnings
 
-torch.backends.cudnn.benchmark = True
 warnings.filterwarnings('ignore')
 
 
 class ConvBlockFixup(nn.Module):
+    """
+    Fixup convolution block
+    """
     def __init__(self, filter_width, input_filters, nb_filters, dilation):
         super(ConvBlockFixup, self).__init__()
         self.filter_width = filter_width
@@ -45,6 +49,9 @@ class ConvBlockFixup(nn.Module):
 
 
 class ConvBlockSkip(nn.Module):
+    """
+    Convolution block with skip connection
+    """
     def __init__(self, window_size, filter_width, input_filters, nb_filters, dilation, batch_norm):
         super(ConvBlockSkip, self).__init__()
         self.filter_width = filter_width
@@ -80,6 +87,9 @@ class ConvBlockSkip(nn.Module):
 
 
 class ConvBlock(nn.Module):
+    """
+    Normal convolution block
+    """
     def __init__(self, filter_width, input_filters, nb_filters, dilation, batch_norm):
         super(ConvBlock, self).__init__()
         self.filter_width = filter_width
@@ -109,22 +119,29 @@ class ConvBlock(nn.Module):
 class DeepConvLSTM(nn.Module):
     def __init__(self, config):
         """
-        DeepConvLSTM model based on architecture suggested by Ordonez et al. (https://www.mdpi.com/1424-8220/16/1/115)
+        DeepConvLSTM model based on architecture suggested by Ordonez and Roggen (https://www.mdpi.com/1424-8220/16/1/115)
 
         :param config: config dictionary containing all settings needed to initialize DeepConvLSTM; these include:
-            - window_size:    number of samples contained in each sliding window
-            - final_seq_len:  length of the sequence after the applying each convolution layer
-            - nb_channels:    number of sensor channels used (i.e. number of features)
-            - nb_classes:     number of classes which are to be predicted (e.g. 2 if binary classification problem)
-            - nb_units_lstm:  number of units within each hidden layer of the LSTM
-            - nb_layers_lstm: number of hidden layers of the LSTM
-            - nb_filters:     list which contains number of filters applied at each convolution layer
-                              (e.g. [64, 128] will result in three convolutions being applied with 64 and 128 filters)
-            - filter_width:    size of the filters (1 x filter_width) applied within the convolution layer
-            - drop_prob:      dropout probability employed after each dense layer (e.g. 0.5 for 50% dropout probability)
-            - weights_init:   type of weight initialization used (choose between 'othogonal', 'kaiming_uniform',
-                              'xavier_uniform' or 'xavier_normal')
-            - seed:           random seed employed to ensure reproducibility of results
+            - pooling:              whether to use pooling layer
+            - reduce_layer:         whether to use reduce layer
+            - reduce_layer_output:  size of output of reduce layer
+            - pool_type:            type of pooling
+            - pool_kernel_width:    width of pooling kernel
+            - window_size:          number of samples contained in each sliding window
+            - final_seq_len:        length of the sequence after the applying each convolution layer
+            - nb_channels:          number of sensor channels used (i.e. number of features)
+            - nb_classes:           number of classes which are to be predicted (e.g. 2 if binary classification problem)
+            - nb_units_lstm:        number of units within each hidden layer of the LSTM
+            - nb_layers_lstm:       number of hidden layers of the LSTM
+            - nb_conv_blocks:       number of convolution blocks
+            - conv_block_type:      type of convolution blocks used
+            - nb_filters:           number of filters employed in convolution blocks
+            - filter_width:         size of the filters (1 x filter_width) applied within the convolution layer
+            - dilation:             dilation factor for convolutions
+            - batch_norm:           whether to use batch normalization
+            - drop_prob:            dropout probability employed after each dense layer (e.g. 0.5 for 50% dropout probability)
+            - weights_init:         type of weight initialization used
+            - seed:                 random seed employed to ensure reproducibility of results
         """
         super(DeepConvLSTM, self).__init__()
         # parameters
@@ -154,9 +171,6 @@ class DeepConvLSTM(nn.Module):
         self.nb_units_lstm = config['nb_units_lstm']
         self.nb_layers_lstm = config['nb_layers_lstm']
 
-        # batch norm
-        if self.batch_norm:
-            self.norm1 = nn.BatchNorm2d(1)
         # define conv layers
         self.conv_blocks = []
         for i in range(self.nb_conv_blocks):
@@ -201,8 +215,6 @@ class DeepConvLSTM(nn.Module):
     def forward(self, x):
         # reshape data for convolutions
         x = x.view(-1, 1, self.window_size, self.nb_channels)
-        if self.batch_norm and self.conv_block_type != 'fixup':
-            x = self.norm1(x)
         for i, conv_block in enumerate(self.conv_blocks):
             x = conv_block(x)
         final_seq_len = x.shape[2]
@@ -218,11 +230,11 @@ class DeepConvLSTM(nn.Module):
             x = x.reshape(-1, final_seq_len, self.nb_channels * self.reduce_layer_output)
         else:
             x = x.reshape(-1, final_seq_len, self.nb_filters * self.nb_channels)
+        x = self.dropout(x)
         for lstm_layer in self.lstm_layers:
             x, _ = lstm_layer(x)
         # reshape data for classifier
         x = x.view(-1, self.nb_units_lstm)
-        x = self.dropout(x)
         x = self.fc(x)
         # reshape data and return predicted label of last sample within final sequence (determines label of window)
         out = x.view(-1, final_seq_len, self.nb_classes)

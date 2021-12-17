@@ -1,3 +1,10 @@
+##################################################
+# All functions related to validating a model
+##################################################
+# Author: Marius Bock
+# Email: marius.bock(at)uni-siegen.de
+##################################################
+
 import os
 
 import numpy as np
@@ -7,36 +14,43 @@ from sklearn.model_selection import StratifiedShuffleSplit, StratifiedKFold
 from data_processing.sliding_window import apply_sliding_window
 from model.DeepConvLSTM import DeepConvLSTM
 from model.evaluate import evaluate_participant_scores
-from model.train import train, init_optimizer, init_loss
+from model.train import train, init_optimizer, init_loss, init_scheduler
 
 
 def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp):
     """
     Method to apply cross-participant cross-validation (also known as leave-one-subject-out cross-validation).
 
-    :param data: data used for applying cross-validation
-    :param custom_net: custom network object
-    :param custom_loss: custom loss object
-    :param custom_opt: custom optimizer object
-    :param args: args object containing all relevant hyperparameters and settings
-    :param log_date: date information needed for saving
-    :param log_timestamp: timestamp information needed for saving
-
-    :return trained network
+    :param data: numpy array
+        Data used for applying cross-validation
+    :param custom_net: pytorch model
+        Custom network object
+    :param custom_loss: loss object
+        Custom loss object
+    :param custom_opt: optimizer object
+        Custom optimizer object
+    :param args: dict
+        Args object containing all relevant hyperparameters and settings
+    :param log_date: string
+        Date information needed for saving
+    :param log_timestamp: string
+        Timestamp information needed for saving
+    :return pytorch model
+        Trained network
     """
 
     print('\nCALCULATING CROSS-PARTICIPANT SCORES USING LOSO CV.\n')
     cp_scores = np.zeros((4, args.nb_classes, int(np.max(data[:, 0]) + 1)))
     train_val_gap = np.zeros((4, int(np.max(data[:, 0]) + 1)))
     all_eval_output = None
-    orig_lr = args.lr
+    orig_lr = args.learning_rate
 
     for i, sbj in enumerate(np.unique(data[:, 0])):
         # for i, sbj in enumerate([0, 1]):
         print('\n VALIDATING FOR SUBJECT {0} OF {1}'.format(int(sbj) + 1, int(np.max(data[:, 0])) + 1))
         train_data = data[data[:, 0] != sbj]
         val_data = data[data[:, 0] == sbj]
-        args.lr = orig_lr
+        args.learning_rate = orig_lr
         # Sensor data is segmented using a sliding window mechanism
         X_train, y_train = apply_sliding_window(train_data[:, :-1], train_data[:, -1],
                                                 sliding_window_size=args.sw_length,
@@ -81,8 +95,15 @@ def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_da
         else:
             print("Did not provide a valid loss name!")
 
+        # lr scheduler initialization
+        if args.adj_lr:
+            print('Adjusting learning rate according to scheduler: ' + args.lr_scheduler)
+            scheduler = init_scheduler(opt, args)
+        else:
+            scheduler = None
+
         net, val_output, train_output = train(X_train, y_train, X_val, y_val,
-                                              network=net, optimizer=opt, loss=loss,
+                                              network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
                                               config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
 
         if all_eval_output is None:
@@ -135,28 +156,35 @@ def per_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_date
     """
     Method to apply per-participant cross-validation.
 
-    :param data: data used for applying cross-validation
-    :param custom_net: custom network object
-    :param custom_loss: custom loss object
-    :param custom_opt: custom optimizer object
-    :param args: args object containing all relevant hyperparameters and settings
-    :param log_date: date information needed for saving
-    :param log_timestamp: timestamp information needed for saving
-
-    :return trained network
+    :param data: numpy array
+        Data used for applying cross-validation
+    :param custom_net: pytorch model
+        Custom network object
+    :param custom_loss: loss object
+        Custom loss object
+    :param custom_opt: optimizer object
+        Custom optimizer object
+    :param args: dict
+        Args object containing all relevant hyperparameters and settings
+    :param log_date: string
+        Date information needed for saving
+    :param log_timestamp: string
+        Timestamp information needed for saving
+    :return pytorch model
+        Trained network
     """
 
     print('\nCALCULATING PER-PARTICIPANT SCORES USING STRATIFIED SHUFFLE SPLIT.\n')
     pp_scores = np.zeros((4, args.nb_classes, int(np.max(data[:, 0]) + 1)))
     all_eval_output = None
     train_val_gap = np.zeros((4, int(np.max(data[:, 0]) + 1)))
-    orig_lr = args.lr
+    orig_lr = args.learning_rate
 
     for i, sbj in enumerate(np.unique(data[:, 0])):
         print('\n VALIDATING FOR SUBJECT {0} OF {1}'.format(int(sbj) + 1, int(np.max(data[:, 0])) + 1))
 
-        sss = StratifiedShuffleSplit(train_size=args.size_sss,
-                                     n_splits=args.splits_sss,
+        sss = StratifiedShuffleSplit(train_size=args.size_pp,
+                                     n_splits=args.splits_pp,
                                      random_state=args.seed)
 
         subject_data = data[data[:, 0] == sbj]
@@ -182,11 +210,11 @@ def per_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_date
         subject_recall_gap = 0
         subject_f1_gap = 0
         for j, (train_index, test_index) in enumerate(sss.split(X, y)):
-            print('SPLIT {0}/{1}'.format(j + 1, args.splits_sss))
+            print('SPLIT {0}/{1}'.format(j + 1, args.splits_pp))
 
             X_train, X_val = X[train_index], X[test_index]
             y_train, y_val = y[train_index], y[test_index]
-            args.lr = orig_lr
+            args.learning_rate = orig_lr
 
             args.window_size = X_train.shape[1]
             args.nb_channels = X_train.shape[2]
@@ -215,8 +243,13 @@ def per_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_date
             else:
                 print("Did not provide a valid loss name!")
 
+            # lr scheduler initialization
+            if args.adj_lr:
+                print('Adjusting learning rate according to scheduler: ' + args.lr_scheduler)
+                scheduler = init_scheduler(opt, args)
+
             net, val_output, train_output = train(X_train, y_train, X_val, y_val,
-                                                  network=net, optimizer=opt, loss=loss,
+                                                  network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
                                                   config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
 
             if all_eval_output is None:
@@ -241,15 +274,15 @@ def per_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_date
             subject_f1_gap += f1_score(train_output[:, 1], train_output[:, 0], average='macro') - \
                               f1_score(val_output[:, 1], val_output[:, 0], average='macro')
 
-        pp_scores[0, :, int(sbj)] = subject_accuracy / args.splits_sss
-        pp_scores[1, :, int(sbj)] = subject_precision / args.splits_sss
-        pp_scores[2, :, int(sbj)] = subject_recall / args.splits_sss
-        pp_scores[3, :, int(sbj)] = subject_f1 / args.splits_sss
+        pp_scores[0, :, int(sbj)] = subject_accuracy / args.splits_pp
+        pp_scores[1, :, int(sbj)] = subject_precision / args.splits_pp
+        pp_scores[2, :, int(sbj)] = subject_recall / args.splits_pp
+        pp_scores[3, :, int(sbj)] = subject_f1 / args.splits_pp
 
-        train_val_gap[0, int(sbj)] = subject_accuracy_gap / args.splits_sss
-        train_val_gap[1, int(sbj)] = subject_precision_gap / args.splits_sss
-        train_val_gap[2, int(sbj)] = subject_recall_gap / args.splits_sss
-        train_val_gap[3, int(sbj)] = subject_f1_gap / args.splits_sss
+        train_val_gap[0, int(sbj)] = subject_accuracy_gap / args.splits_pp
+        train_val_gap[1, int(sbj)] = subject_precision_gap / args.splits_pp
+        train_val_gap[2, int(sbj)] = subject_recall_gap / args.splits_pp
+        train_val_gap[3, int(sbj)] = subject_f1_gap / args.splits_pp
 
         print("SUBJECT {0} VALIDATION RESULTS: ".format(int(sbj)))
         print("Accuracy: {0}".format(pp_scores[0, :, int(sbj)]))
@@ -274,16 +307,24 @@ def train_valid_split(train_data, valid_data, custom_net, custom_loss, custom_op
     """
     Method to apply normal cross-validation, i.e. one set split into train, validation and testing data.
 
-    :param train_data: train features & labels used for applying cross-validation
-    :param valid_data: validation features & labels used for applying cross-validation
-    :param custom_net: custom network object
-    :param custom_loss: custom loss object
-    :param custom_opt: custom optimizer object
-    :param args: args object containing all relevant hyperparameters and settings
-    :param log_date: date information needed for saving
-    :param log_timestamp: timestamp information needed for saving
-
-    :return trained network
+    :param train_data: numpy array
+        Data used for training
+    :param valid_data: numpy array
+        Data used for validation
+    :param custom_net: pytorch model
+        Custom network object
+    :param custom_loss: loss object
+        Custom loss object
+    :param custom_opt: optimizer object
+        Custom optimizer object
+    :param args: dict
+        Args object containing all relevant hyperparameters and settings
+    :param log_date: string
+        Date information needed for saving
+    :param log_timestamp: string
+        Timestamp information needed for saving
+    :return pytorch model
+        Trained network
     """
     print('\nCALCULATING TRAIN-VALID-SPLIT SCORES.\n')
 
@@ -331,8 +372,15 @@ def train_valid_split(train_data, valid_data, custom_net, custom_loss, custom_op
     else:
         print("Did not provide a valid loss name!")
 
+    # lr scheduler initialization
+    if args.adj_lr:
+        print('Adjusting learning rate according to scheduler: ' + args.lr_scheduler)
+        scheduler = init_scheduler(opt, args)
+    else:
+        scheduler = None
+
     net, val_output, train_output = train(X_train, y_train, X_val, y_val,
-                                          network=net, optimizer=opt, loss=loss,
+                                          network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
                                           config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
 
     cls = np.array(range(args.nb_classes))
@@ -367,17 +415,24 @@ def train_valid_split(train_data, valid_data, custom_net, custom_loss, custom_op
 
 def k_fold(data, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp):
     """
-    Method to apply per-participant cross-validation.
+    Method to apply k-fold cross-validation.
 
-    :param data: data used for applying cross-validation
-    :param custom_net: custom network object
-    :param custom_loss: custom loss object
-    :param custom_opt: custom optimizer object
-    :param args: args object containing all relevant hyperparameters and settings
-    :param log_date: date information needed for saving
-    :param log_timestamp: timestamp information needed for saving
-
-    :return trained network
+    :param data: numpy array
+        Data used for applying cross-validation
+    :param custom_net: pytorch model
+        Custom network object
+    :param custom_loss: loss object
+        Custom loss object
+    :param custom_opt: optimizer object
+        Custom optimizer object
+    :param args: dict
+        Args object containing all relevant hyperparameters and settings
+    :param log_date: string
+        Date information needed for saving
+    :param log_timestamp: string
+        Timestamp information needed for saving
+    :return pytorch model
+        Trained network
     """
     print('\nCALCULATING K-FOLD SCORES USING STRATIFIED K-FOLD.\n')
     # sensor data is segmented using a sliding window mechanism
@@ -390,7 +445,7 @@ def k_fold(data, custom_net, custom_loss, custom_opt, args, log_date, log_timest
 
     X = X[:, :, 1:]
 
-    orig_lr = args.lr
+    orig_lr = args.learning_rate
 
     skf = StratifiedKFold(n_splits=args.splits_kfold, shuffle=True, random_state=args.seed)
 
@@ -409,7 +464,7 @@ def k_fold(data, custom_net, custom_loss, custom_opt, args, log_date, log_timest
 
         X_train, X_val = X[train_index], X[test_index]
         y_train, y_val = y[train_index], y[test_index]
-        args.lr = orig_lr
+        args.learning_rate = orig_lr
 
         args.window_size = X_train.shape[1]
         args.nb_channels = X_train.shape[2]
@@ -438,8 +493,13 @@ def k_fold(data, custom_net, custom_loss, custom_opt, args, log_date, log_timest
         else:
             print("Did not provide a valid loss name!")
 
+        # lr scheduler initialization
+        if args.adj_lr:
+            print('Adjusting learning rate according to scheduler: ' + args.lr_scheduler)
+            scheduler = init_scheduler(opt, args)
+
         net, val_output, train_output = train(X_train, y_train, X_val, y_val,
-                                              network=net, optimizer=opt, loss=loss,
+                                              network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
                                               config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
 
         fold_acc = jaccard_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)

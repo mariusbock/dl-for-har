@@ -1,3 +1,10 @@
+##################################################
+# All functions related to creating datasets
+##################################################
+# Author: Marius Bock
+# Email: marius.bock(at)uni-siegen.de
+##################################################
+
 from PyAV.av.io import read
 import re
 
@@ -15,11 +22,14 @@ def milliseconds_to_hertz(start, end, rate):
     """
     Function which converts milliseconds to hertz timestamps
 
-    :param start: start time in milliseconds
-    :param end: end time in milliseconds
-    :param rate: employed sampling rate during recording
-
-    :return start and end time in hertz
+    :param start: float
+        Start time in milliseconds
+    :param end: float
+        End time in milliseconds
+    :param rate: int
+        Employed sampling rate during recording
+    :return int, int
+        Start and end time in hertz
     """
     adjusted_rate = rate / 1000
     return int(np.floor(float(start) * adjusted_rate)), int(np.floor(float(end) * adjusted_rate))
@@ -29,13 +39,16 @@ def create_wetlab_data_from_mkvs(feature_tracks, label_tracks, raw_dir, save_dir
     """
     Function which creates the a csv file using the WetLab mkv dataset files as input.
 
-    :param feature_tracks: tracks which contain the features that are to be used from the wetlab mkvs
-    :param label_tracks: tracks which contain the labels that are to be used from the wetlab mkvs
-    :param raw_dir: directory where the raw files are located
-    :param save_dir: directory where the resulting csv is to be saved to
-    :param sample_rate: sampling rate
-
-    :return pandas dataframe containing wetlab features
+    :param feature_tracks: lambda expression
+        Tracks which contain the features that are to be used from the wetlab mkvs
+    :param label_tracks: lambda expression
+        Tracks which contain the labels that are to be used from the wetlab mkvs
+    :param raw_dir: string
+        Directory where the raw files are located
+    :param save_dir: string
+        Directory where the resulting csv is to be saved to
+    :param sample_rate: int
+        Sampling rate
     """
     filenames = sorted(glob(os.path.join(raw_dir, 'wetlab', '*.mkv')))
     # obtain unique labels
@@ -71,16 +84,17 @@ def create_wetlab_data_from_mkvs(feature_tracks, label_tracks, raw_dir, save_dir
     output.columns = ['subject_id', 'acc_x', 'acc_y', 'acc_z', 'activity_label_1', 'activity_label_2']
     output = output.astype({'subject_id': int, 'acc_x': float, 'acc_y': float, 'acc_z': float, 'activity_label_1': str, 'activity_label_2': str})
 
-    output.to_csv(os.path.join(save_dir, 'wetlab_data.csv'), index=False, header=False)
+    #output.to_csv(os.path.join(save_dir, 'wetlab_data.csv'), index=False, header=False)
 
 
 def create_sbhar_dataset(raw_dir, save_dir):
     """
     Function to create SBHAR dataset (containing only acceleration data).
 
-    :param raw_dir: folder in which raw data is contained
-
-    :return pandas dataframe containing all data
+    :param raw_dir: string
+        Folder in which raw data is contained
+    :param save_dir: string
+        Folder where the resulting csv is to be saved to
     """
 
     label_dict = {
@@ -137,16 +151,17 @@ def create_sbhar_dataset(raw_dir, save_dir):
     output_data = output_data.replace({'activity_label': label_dict})
     output_data = output_data.astype({'subject_id': int, 'acc_x': float, 'acc_y': float, 'acc_z': float, 'activity_label': str})
 
-    output_data.to_csv(os.path.join(save_dir, 'sbhar_data.csv'), index=False, header=False)
+    #output_data.to_csv(os.path.join(save_dir, 'sbhar_data.csv'), index=False, header=False)
 
 
 def create_hhar_dataset(raw_dir, save_dir):
     """
     Function to create HHAR dataset (containing only acceleration data).
 
-    :param raw_dir: folder in which raw data is contained
-
-    :return pandas dataframe containing all data
+    :param raw_dir: string
+        Folder in which raw data is contained
+    :param save_dir: string
+        Folder where the resulting csv is to be saved to
     """
     data = pd.read_csv(os.path.join(raw_dir, 'hhar', 'Watch_accelerometer.csv'))
 
@@ -167,7 +182,7 @@ def create_hhar_dataset(raw_dir, save_dir):
     data = data[['User', 'x', 'y', 'z', 'gt']]
     data = data.fillna('null_class')
 
-    data.to_csv(os.path.join(save_dir, 'hhar_data.csv'), index=False, header=False)
+    #data.to_csv(os.path.join(save_dir, 'hhar_data.csv'), index=False, header=False)
 
 
 def create_rwhar_dataset(raw_dir, save_dir):
@@ -176,8 +191,10 @@ def create_rwhar_dataset(raw_dir, save_dir):
 
     Original Author : Sandeep Ramachandra, sandeep.ramachandra@student.uni-siegen.de
     Modified by: Marius Bock
-
-    :return: pandas dataframe containing all data
+    :param raw_dir: string
+        Folder in which raw data is contained
+    :param save_dir: string
+        Folder where the resulting csv is to be saved to
     """
     RWHAR_ACTIVITY_NUM = {
         "climbingdown": 'climbing_down',
@@ -296,7 +313,7 @@ def create_rwhar_dataset(raw_dir, save_dir):
     data = data[['subject', 'acc_x', 'acc_y', 'acc_z', 'activity']]
     data = data.astype({'subject': int, 'acc_x': float, 'acc_y': float, 'acc_z': float, 'activity': str})
 
-    data.to_csv(os.path.join(save_dir, 'rwhar_data.csv'), index=False, header=False)
+    #data.to_csv(os.path.join(save_dir, 'rwhar_data.csv'), index=False, header=False)
 
 
 def create_opportunity_dataset(raw_dir, save_dir):
@@ -304,8 +321,10 @@ def create_opportunity_dataset(raw_dir, save_dir):
     Funtion to create Opportunity dataset. Saves both data used in Ordonez et al. as well as full dataset. Preprocessing
     same as Ordonez et al.
 
-    :param folder: folder name where Opportunity zip file lies
-    :param output_folder: folder where to save the final datasets
+    :param raw_dir: string
+        Folder in which raw data is contained
+    :param save_dir: string
+        Folder where the resulting csv is to be saved to
     """
 
     # Hardcoded number of sensor channels employed in the OPPORTUNITY challenge
@@ -472,7 +491,7 @@ def create_opportunity_dataset(raw_dir, save_dir):
         """Function to read the OPPORTUNITY challenge raw data and process all sensor channels
         :param dataset: string
             Path with original OPPORTUNITY zip file
-        :param target_filename: string
+        :param target_folder: string
             Processed file
         """
         full = np.empty((0, NB_SENSOR_CHANNELS + 3))
@@ -502,11 +521,11 @@ def create_opportunity_dataset(raw_dir, save_dir):
         full_data[114] = adjust_idx_labels(full_data[114], 'locomotion')
         full_data[115] = adjust_idx_labels(full_data[115], 'gestures')
 
-        full_data.to_csv(os.path.join(target_folder, 'opportunity_data.csv'), index=False, header=False)
+        #full_data.to_csv(os.path.join(target_folder, 'opportunity_data.csv'), index=False, header=False)
         # write Ordonez split
-        full_data.iloc[:nb_test_samples, :].to_csv(os.path.join(target_folder, 'opportunity_ordonez_data.csv'), index=False, header=False)
+        #full_data.iloc[:nb_test_samples, :].to_csv(os.path.join(target_folder, 'opportunity_ordonez_data.csv'), index=False, header=False)
 
-    generate_data(os.path.join(raw_path, 'opportunity', 'OpportunityUCIDataset.zip'), save_dir)
+    generate_data(os.path.join(raw_dir, 'opportunity', 'OpportunityUCIDataset.zip'), save_dir)
 
 
 if __name__ == '__main__':

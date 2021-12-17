@@ -1,3 +1,10 @@
+##################################################
+# Helper functions (logging-related)
+##################################################
+# Author: Marius Bock
+# Email: marius.bock(at)uni-siegen.de
+##################################################
+
 from __future__ import absolute_import
 import os
 import sys
@@ -6,6 +13,9 @@ from .osutils import mkdir_if_missing
 
 
 class Logger(object):
+    """
+    Logger object used to redirect console output to textfile
+    """
     def __init__(self, fpath=None):
         self.console = sys.stdout
         self.file = None
