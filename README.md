@@ -64,7 +64,7 @@ pip install -r requirements.txt
 
 The datasets (raw and preprocessed data) used during experiments can be either downloaded via this link: 
 
-Only processed dataset: https://uni-siegen.sciebo.de/s/2RUGj9UG5sqEf6t
+Only processed dataset: https://uni-siegen.sciebo.de/s/XleBdbYic7ctiXF
 Processed + raw data: https://uni-siegen.sciebo.de/s/J9AjZL2g30fPh6c
 
 PW: iswc21
