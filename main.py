@@ -54,7 +54,7 @@ DATASET = 'rwhar'
 PRED_TYPE = 'gestures'
 CUTOFF_TYPE = 'subject'
 CUTOFF_TRAIN = 10
-CUTOFF_VALID = 300
+CUTOFF_VALID = None
 SW_LENGTH = 1
 SW_UNIT = 'seconds'
 SW_OVERLAP = 60
@@ -139,7 +139,7 @@ SPLITS_PP = 5
 SIZE_PP = 0.6
 WEIGHTED = False
 ADJ_LR = False
-LR_SCHEDULER = 'reduce_lr_on_plateau'
+LR_SCHEDULER = 'step_lr'
 LR_STEP = 10
 LR_DECAY = 0.9
 EARLY_STOPPING = False
@@ -226,30 +226,44 @@ def main(args):
         train = data[:497014, :]
         valid = data[497014:557963, :]
         test = data[557963:, :]
+    # subject-wise splitting
     elif args.cutoff_type == 'subject':
         train = data[(data[:, 0] <= (args.cutoff_train - 1))]
-        valid = data[(data[:, 0] > (args.cutoff_train - 1)) & (data[:, 0] <= (args.cutoff_valid - 1))]
-        test = data[(data[:, 0] > (args.cutoff_valid - 1))]
-        train_val = np.concatenate((train, valid), axis=0)
+        if args.cutoff_valid:
+            valid = data[(data[:, 0] > (args.cutoff_train - 1)) & (data[:, 0] <= (args.cutoff_valid - 1))]
+            test = data[(data[:, 0] > (args.cutoff_valid - 1))]
+            train_val = np.concatenate((train, valid), axis=0)
+        else:
+            valid = data[(data[:, 0] > (args.cutoff_train - 1))]
+            test = None
+            train_val = np.concatenate((train, valid), axis=0)
+    # percentage-wise splitting
     elif args.cutoff_type == 'percentage':
-        X_train_val, X_test, y_train_val, y_test = train_test_split(X, y,
-                                                                    train_size=(args.cutoff_train + args.cutoff_valid),
-                                                                    shuffle=False)
+        if args.cutoff_valid:
+            X_train_val, X_test, y_train_val, y_test = train_test_split(X, y,
+                                                                        train_size=(args.cutoff_train + args.cutoff_valid),
+                                                                        shuffle=False)
 
-        X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val,
-                                                          train_size=args.cutoff_train / (args.cutoff_train + args.cutoff_valid),
-                                                          shuffle=False)
+            X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val,
+                                                              train_size=args.cutoff_train / (args.cutoff_train + args.cutoff_valid),
+                                                              shuffle=False)
+            test = np.concatenate((X_test, (np.array(y_test)[:, None])), axis=1)
+        else:
+            X_train, X_val, y_train, y_val = train_test_split(X, y, train_size=args.cutoff_train, shuffle=False)
+            test = None
 
         train = np.concatenate((X_train, (np.array(y_train)[:, None])), axis=1)
         valid = np.concatenate((X_val, (np.array(y_val)[:, None])), axis=1)
-        test = np.concatenate((X_test, (np.array(y_test)[:, None])), axis=1)
-
-        train_val = np.concatenate((X_train_val, (np.array(y_train_val)[:, None])), axis=1)
+        train_val = np.concatenate((train, valid), axis=0)
+    # record-wise splitting
     elif args.cutoff_type == 'record':
         train = data[:args.cutoff_train, :]
-        valid = data[args.cutoff_train:args.cutoff_valid, :]
-        test = data[args.cutoff_valid:, :]
-
+        if args.cutoff_valid:
+            valid = data[args.cutoff_train:args.cutoff_valid, :]
+            test = data[args.cutoff_valid:, :]
+        else:
+            valid = data[args.cutoff_train:, :]
+            test = None
         train_val = np.concatenate((train, valid), axis=1)
 
     print("Split datasets with size: | train {0} | valid {1} | test {2} |".format(train.shape, valid.shape, test.shape))
@@ -271,7 +285,8 @@ def main(args):
         print('Did not choose a valid validation type dataset!')
         exit()
 
-    # test predictions
+    ############################################# TESTING ##############################################################
+
     if test.size != 0:
         X_test, y_test = apply_sliding_window(test[:, :-1], test[:, -1],
                                               args.sw_length, args.sw_unit, args.sampling_rate, args.sw_overlap)
@@ -342,7 +357,7 @@ if __name__ == '__main__':
                              'Default: cross-participant')
     parser.add_argument('-swu', '--sw_unit', default=SW_UNIT, type=str,
                         help='sliding window unit used. Options: units, seconds.'
-                             'Default: units')
+                             'Default: seconds')
     parser.add_argument('-wi', '--weights_init', default=WEIGHTS_INIT, type=str,
                         help='weight initialization method used. Options: normal, orthogonal, xavier_uniform, '
                              'xavier_normal, kaiming_uniform, kaiming_normal. '
@@ -355,7 +370,7 @@ if __name__ == '__main__':
                              'Default: adam')
     parser.add_argument('-l', '--loss', default=LOSS, type=str,
                         help='Loss to be used. Options: cross_entropy, maxup.'
-                             'Default: cross-entropy')
+                             'Default: cross_entropy')
     parser.add_argument('-g', '--gpu', default=GPU, type=str,
                         help='GPU to be used. Default: cuda:1')
     parser.add_argument('-lrs', '--lr_scheduler', default=LR_SCHEDULER, type=str,
@@ -365,6 +380,7 @@ if __name__ == '__main__':
                         help='type of convolution blocks used. Options: normal, skip, fixup.'
                              'Default: normal')
 
+    # Integers
     parser.add_argument('-pf', '--print_freq', default=PRINT_FREQ, type=int,
                         help='If verbose, frequency of which is printed (batches).'
                              'Default: 100')
@@ -372,8 +388,9 @@ if __name__ == '__main__':
                         help='Cutoff point for train dataset. See documentation for further explanations. '
                              'Default: 10')
     parser.add_argument('-cov', '--cutoff_valid', default=CUTOFF_VALID, type=int,
-                        help='Cutoff point for validation dataset. See documentation for further explanations. '
-                             'Default: 12')
+                        help='Cutoff point for validation dataset. If None, no testing is performed. '
+                             'See documentation for further explanations. '
+                             'Default: None')
     parser.add_argument('-sskf', '--splits_kfold', default=SPLITS_KFOLD, type=int,
                         help='No. splits for k-fold cv. '
                              'Default: 5')
@@ -420,12 +437,13 @@ if __name__ == '__main__':
                         help='Period of learning rate decay (patience if plateau scheduler).'
                              'Default: 10')
 
+    # Floats
     parser.add_argument('-spp', '--size_pp', default=SIZE_PP, type=float,
                         help='Size of validation set in per-participant eval.'
                              'Default: 0.6')
     parser.add_argument('-swl', '--sw_length', default=SW_LENGTH, type=float,
                         help='Length of sliding window. '
-                             'Default: 50')
+                             'Default: 1')
     parser.add_argument('-swo', '--sw_overlap', default=SW_OVERLAP, type=int,
                         help='Overlap employed between sliding windows.'
                              'Default: 60')
