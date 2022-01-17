@@ -84,7 +84,7 @@ def create_wetlab_data_from_mkvs(feature_tracks, label_tracks, raw_dir, save_dir
     output.columns = ['subject_id', 'acc_x', 'acc_y', 'acc_z', 'activity_label_1', 'activity_label_2']
     output = output.astype({'subject_id': int, 'acc_x': float, 'acc_y': float, 'acc_z': float, 'activity_label_1': str, 'activity_label_2': str})
 
-    #output.to_csv(os.path.join(save_dir, 'wetlab_data.csv'), index=False, header=False)
+    output.to_csv(os.path.join(save_dir, 'wetlab_data.csv'), index=False, header=False)
 
 
 def create_sbhar_dataset(raw_dir, save_dir):
@@ -151,7 +151,7 @@ def create_sbhar_dataset(raw_dir, save_dir):
     output_data = output_data.replace({'activity_label': label_dict})
     output_data = output_data.astype({'subject_id': int, 'acc_x': float, 'acc_y': float, 'acc_z': float, 'activity_label': str})
 
-    #output_data.to_csv(os.path.join(save_dir, 'sbhar_data.csv'), index=False, header=False)
+    output_data.to_csv(os.path.join(save_dir, 'sbhar_data.csv'), index=False, header=False)
 
 
 def create_hhar_dataset(raw_dir, save_dir):
@@ -182,7 +182,7 @@ def create_hhar_dataset(raw_dir, save_dir):
     data = data[['User', 'x', 'y', 'z', 'gt']]
     data = data.fillna('null_class')
 
-    #data.to_csv(os.path.join(save_dir, 'hhar_data.csv'), index=False, header=False)
+    data.to_csv(os.path.join(save_dir, 'hhar_data.csv'), index=False, header=False)
 
 
 def create_rwhar_dataset(raw_dir, save_dir):
@@ -313,7 +313,7 @@ def create_rwhar_dataset(raw_dir, save_dir):
     data = data[['subject', 'acc_x', 'acc_y', 'acc_z', 'activity']]
     data = data.astype({'subject': int, 'acc_x': float, 'acc_y': float, 'acc_z': float, 'activity': str})
 
-    #data.to_csv(os.path.join(save_dir, 'rwhar_data.csv'), index=False, header=False)
+    data.to_csv(os.path.join(save_dir, 'rwhar_data.csv'), index=False, header=False)
 
 
 def create_opportunity_dataset(raw_dir, save_dir):
@@ -521,9 +521,9 @@ def create_opportunity_dataset(raw_dir, save_dir):
         full_data[114] = adjust_idx_labels(full_data[114], 'locomotion')
         full_data[115] = adjust_idx_labels(full_data[115], 'gestures')
 
-        #full_data.to_csv(os.path.join(target_folder, 'opportunity_data.csv'), index=False, header=False)
+        full_data.to_csv(os.path.join(target_folder, 'opportunity_data.csv'), index=False, header=False)
         # write Ordonez split
-        #full_data.iloc[:nb_test_samples, :].to_csv(os.path.join(target_folder, 'opportunity_ordonez_data.csv'), index=False, header=False)
+        full_data.iloc[:nb_test_samples, :].to_csv(os.path.join(target_folder, 'opportunity_ordonez_data.csv'), index=False, header=False)
 
     generate_data(os.path.join(raw_dir, 'opportunity', 'OpportunityUCIDataset.zip'), save_dir)
 

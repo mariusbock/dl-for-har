@@ -10,13 +10,11 @@ import os
 import time
 import sys
 import numpy as np
-import pickle
 
 from sklearn.model_selection import train_test_split
 
 from data_processing.preprocess_data import load_dataset, compute_mean_and_std
 from data_processing.sliding_window import apply_sliding_window
-from misc.osutils import mkdir_if_missing
 from model.validation import cross_participant_cv, per_participant_cv, train_valid_split, k_fold
 from model.train import predict
 
@@ -52,11 +50,11 @@ DATASET OPTIONS:
 - INCLUDE_NULL: boolean whether to include null class in datasets (does not work with opportunity_ordonez dataset)
 """
 
-DATASET = 'opportunity_ordonez'
+DATASET = 'rwhar'
 PRED_TYPE = 'gestures'
 CUTOFF_TYPE = 'subject'
 CUTOFF_TRAIN = 10
-CUTOFF_VALID = 12
+CUTOFF_VALID = 300
 SW_LENGTH = 1
 SW_UNIT = 'seconds'
 SW_OVERLAP = 60
@@ -66,6 +64,7 @@ INCLUDE_NULL = True
 """
 NETWORK OPTIONS:
 - NETWORK: network architecture to be used (e.g. 'deepconvlstm')
+- LSTM: boolean whether to employ a lstm after convolution layers
 - NB_UNITS_LSTM: number of hidden units in each LSTM layer
 - NB_LAYERS_LSTM: number of layers in LSTM
 - CONV_BLOCK_TYPE: type of convolution blocks employed ('normal', 'skip' or 'fixup')
@@ -83,12 +82,13 @@ NETWORK OPTIONS:
 """
 
 NETWORK = 'deepconvlstm'
+NO_LSTM = False
 NB_UNITS_LSTM = 128
 NB_LAYERS_LSTM = 1
 CONV_BLOCK_TYPE = 'normal'
 NB_CONV_BLOCKS = 2
 NB_FILTERS = 64
-FILTER_WIDTH = 5
+FILTER_WIDTH = 11
 DILATION = 1
 DROP_PROB = 0.5
 POOLING = False
@@ -147,32 +147,35 @@ ES_PATIENCE = 10
 
 """
 LOGGING OPTIONS:
+- NAME: name of the experiment; used for logging purposes
 - LOGGING: boolean whether to log console outputs in a text file
 - PRINT_COUNTS: boolean whether to print the distribution of predicted labels after each epoch 
 - VERBOSE: boolean whether to print batchwise results during epochs
 - PRINT_FREQ: number of batches after which batchwise results are printed
 - SAVE_TEST_PREDICTIONS: boolean whether to save test predictions
-- SAVE_MODEL: boolean whether to save the model after last epoch as pickle file
+- SAVE_MODEL: boolean whether to save the model after last epoch as a checkpoint file
 - SAVE_GRADIENT_PLOT: boolean whether to save the gradient flow plot
 """
 
-LOGGING = True
-PRINT_COUNTS = True
-VERBOSE = True
+NAME = None
+LOGGING = False
+PRINT_COUNTS = False
+VERBOSE = False
 PRINT_FREQ = 100
-SAVE_TEST_PREDICTIONS = True
-SAVE_MODEL = True
-SAVE_GRADIENT_PLOT = True
+SAVE_TEST_PREDICTIONS = False
+SAVE_CHECKPOINTS = False
+SAVE_ANALYSIS = False
+SAVE_GRADIENT_PLOT = False
 
 
 def main(args):
     # check if valid prediction type chosen for dataset
-    if DATASET == 'opportunity' or DATASET == 'opportunity_ordonez':
-        if PRED_TYPE != 'gestures' and PRED_TYPE != 'locomotion':
+    if args.dataset == 'opportunity' or args.dataset == 'opportunity_ordonez':
+        if args.pred_type != 'gestures' and args.pred_type != 'locomotion':
             print('Did not choose a valid prediction type for Opportunity dataset!')
             exit()
-    elif DATASET == 'wetlab':
-        if PRED_TYPE != 'actions' and PRED_TYPE != 'tasks':
+    elif args.dataset == 'wetlab':
+        if args.pred_type != 'actions' and args.pred_type != 'tasks':
             print('Did not choose a valid prediction type for Wetlab dataset!')
             exit()
 
@@ -183,7 +186,10 @@ def main(args):
 
     # saves logs to a file (standard output redirected)
     if args.logging:
-        sys.stdout = Logger(os.path.join('logs', log_date, log_timestamp, 'log.txt'))
+        if args.name:
+            sys.stdout = Logger(os.path.join('logs', log_date, log_timestamp, 'log_{}.txt'.format(args.name)))
+        else:
+            sys.stdout = Logger(os.path.join('logs', log_date, log_timestamp, 'log.txt'))
 
     print('Applied settings: ')
     print(args)
@@ -272,11 +278,6 @@ def main(args):
         X_test = X_test[:, :, 1:]
         predict(X_test, y_test, trained_net, vars(args), log_date, log_timestamp)
 
-    # if selected, save model as pickle file
-    if args.save_model:
-        mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
-        pickle.dump(trained_net, open(os.path.join('logs', log_date, log_timestamp, 'trained_model.sav'), 'wb'))
-
     # calculate time data creation took
     end = time.time()
     hours, rem = divmod(end - start, 3600)
@@ -313,10 +314,16 @@ if __name__ == '__main__':
                         help='Flag indicating to adjust learning rate')
     parser.add_argument('--early_stopping', default=EARLY_STOPPING, action='store_true',
                         help='Flag indicating to employ early stopping')
-    parser.add_argument('--save_model', default=SAVE_MODEL, action='store_true',
-                        help='Flag indicating to save the trained model as a pickle file')
+    parser.add_argument('--save_checkpoints', default=SAVE_CHECKPOINTS, action='store_true',
+                        help='Flag indicating to save the trained model as a checkpoint file')
+    parser.add_argument('--no_lstm', default=NO_LSTM, action='store_true',
+                        help='Flag indicating whether to omit LSTM from architecture')
+    parser.add_argument('--save_analysis', default=SAVE_ANALYSIS, action='store_true',
+                        help='Flag indicating whether to save analysis results.')
 
     # Strings
+    parser.add_argument('--name', default=NAME, type=str,
+                        help='Name of the experiment (visible in logging). Default: None')
     parser.add_argument('-d', '--dataset', default=DATASET, type=str,
                         help='Dataset to be used. Options: rwhar, sbhar, wetlab, hhar or opportunity_ordonez. '
                              'Default: rwhar')

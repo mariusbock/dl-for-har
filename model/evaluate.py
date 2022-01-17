@@ -206,7 +206,11 @@ def evaluate_participant_scores(participant_scores, gen_gap_scores, input_cm, cl
         plt.xticks(rotation=90)
     fig.subplots_adjust(hspace=0.5)
     mkdir_if_missing(filepath)
-    plt.savefig(os.path.join(filepath, filename + '_bx.png'))
-
-    # create confusion matrix
-    plot_confusion_matrix(input_cm, class_names, normalize=False, output_path=os.path.join(filepath, filename + '_cm.png'))
+    if args.name:
+        plt.savefig(os.path.join(filepath, filename + '_bx_{}.png'.format(args.name)))
+        plot_confusion_matrix(input_cm, class_names, normalize=False,
+                              output_path=os.path.join(filepath, filename + '_cm_{}.png'.format(args.name)))
+    else:
+        plt.savefig(os.path.join(filepath, filename + '_bx.png'))
+        plot_confusion_matrix(input_cm, class_names, normalize=False,
+                              output_path=os.path.join(filepath, filename + '_cm.png'))

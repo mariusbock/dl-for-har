@@ -122,6 +122,7 @@ class DeepConvLSTM(nn.Module):
         DeepConvLSTM model based on architecture suggested by Ordonez and Roggen (https://www.mdpi.com/1424-8220/16/1/115)
 
         :param config: config dictionary containing all settings needed to initialize DeepConvLSTM; these include:
+            - no_lstm:              whether not to use an lstm
             - pooling:              whether to use pooling layer
             - reduce_layer:         whether to use reduce layer
             - reduce_layer_output:  size of output of reduce layer
@@ -145,6 +146,7 @@ class DeepConvLSTM(nn.Module):
         """
         super(DeepConvLSTM, self).__init__()
         # parameters
+        self.no_lstm = config['no_lstm']
         self.pooling = config['pooling']
         self.reduce_layer = config['reduce_layer']
         self.reduce_layer_output = config['reduce_layer_output']
@@ -196,48 +198,62 @@ class DeepConvLSTM(nn.Module):
                 self.pool = nn.AvgPool2d((self.pool_kernel_width, 1))
         if self.reduce_layer:
             self.reduce = nn.Conv2d(self.nb_filters, self.reduce_layer_output, (self.filter_width, 1))
+        self.final_seq_len = self.window_size - (self.filter_width - 1) * (self.nb_conv_blocks * 2)
         # define lstm layers
-        self.lstm_layers = []
-        for i in range(self.nb_layers_lstm):
-            if i == 0:
-                if self.reduce_layer:
-                    self.lstm_layers.append(nn.LSTM(self.nb_channels * self.reduce_layer_output, self.nb_units_lstm))
+        if not self.no_lstm:
+            self.lstm_layers = []
+            for i in range(self.nb_layers_lstm):
+                if i == 0:
+                    if self.reduce_layer:
+                        self.lstm_layers.append(nn.LSTM(self.nb_channels * self.reduce_layer_output, self.nb_units_lstm))
+                    else:
+                        self.lstm_layers.append(nn.LSTM(self.nb_channels * self.nb_filters, self.nb_units_lstm))
                 else:
-                    self.lstm_layers.append(nn.LSTM(self.nb_channels * self.nb_filters, self.nb_units_lstm))
-            else:
-                self.lstm_layers.append(nn.LSTM(self.nb_units_lstm, self.nb_units_lstm))
-        self.lstm_layers = nn.ModuleList(self.lstm_layers)
+                    self.lstm_layers.append(nn.LSTM(self.nb_units_lstm, self.nb_units_lstm))
+            self.lstm_layers = nn.ModuleList(self.lstm_layers)
         # define dropout layer
         self.dropout = nn.Dropout(self.drop_prob)
         # define classifier
-        self.fc = nn.Linear(self.nb_units_lstm, self.nb_classes)
+        if self.no_lstm:
+            if self.reduce_layer:
+                self.fc = nn.Linear(self.reduce_layer_output * self.nb_channels, self.nb_classes)
+            else:
+                self.fc = nn.Linear(self.nb_filters * self.nb_channels, self.nb_classes)
+        else:
+            self.fc = nn.Linear(self.nb_units_lstm, self.nb_classes)
 
     def forward(self, x):
         # reshape data for convolutions
         x = x.view(-1, 1, self.window_size, self.nb_channels)
         for i, conv_block in enumerate(self.conv_blocks):
             x = conv_block(x)
-        final_seq_len = x.shape[2]
         if self.pooling:
             x = self.pool(x)
-            final_seq_len = x.shape[2]
+            self.final_seq_len = x.shape[2]
         if self.reduce_layer:
             x = self.reduce(x)
-            final_seq_len = x.shape[2]
+            self.final_seq_len = x.shape[2]
         # permute dimensions and reshape for LSTM
         x = x.permute(0, 2, 1, 3)
         if self.reduce_layer:
-            x = x.reshape(-1, final_seq_len, self.nb_channels * self.reduce_layer_output)
+            x = x.reshape(-1, self.final_seq_len, self.nb_channels * self.reduce_layer_output)
         else:
-            x = x.reshape(-1, final_seq_len, self.nb_filters * self.nb_channels)
-        x = self.dropout(x)
-        for lstm_layer in self.lstm_layers:
-            x, _ = lstm_layer(x)
-        # reshape data for classifier
-        x = x.view(-1, self.nb_units_lstm)
+            x = x.reshape(-1, self.final_seq_len, self.nb_filters * self.nb_channels)
+        if self.no_lstm:
+            if self.reduce_layer:
+                x = x.view(-1, self.nb_channels * self.reduce_layer_output)
+            else:
+                x = x.view(-1, self.nb_filters * self.nb_channels)
+        else:
+            for lstm_layer in self.lstm_layers:
+                x, _ = lstm_layer(x)
+            # reshape data for classifier
+            x = x.view(-1, self.nb_units_lstm)
         x = self.fc(x)
         # reshape data and return predicted label of last sample within final sequence (determines label of window)
-        out = x.view(-1, final_seq_len, self.nb_classes)
+        x = self.dropout(x)
+        out = x.view(-1, self.final_seq_len, self.nb_classes)
+
         return out[:, -1, :]
 
     def number_of_parameters(self):

@@ -8,6 +8,7 @@
 ##################################################
 
 import os
+import random
 
 from sklearn.metrics import precision_score, recall_score, f1_score, jaccard_score
 import time
@@ -300,14 +301,14 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
 
     # initialize training and validation dataset, define DataLoaders
     dataset = torch.utils.data.TensorDataset(torch.from_numpy(train_features), torch.from_numpy(train_labels))
-    trainloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True,
+    trainloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=False,
                              worker_init_fn=np.random.seed(int(config['seed'])))
     dataset = torch.utils.data.TensorDataset(torch.from_numpy(val_features), torch.from_numpy(val_labels))
     valloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=False,
                            worker_init_fn=np.random.seed(int(config['seed'])))
 
     # counters and objects used for early stopping and learning rate adjustment
-    best_loss = np.inf
+    best_metric = 0.0
     best_network = None
     best_val_losses = None
     best_train_losses = None
@@ -454,8 +455,9 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
                 lr_scheduler.step()
 
         # employ early stopping if employed
-        if config['early_stopping']:
-            if best_loss < np.mean(val_losses):
+        metric = f1_score(val_gt, val_preds, average='macro')
+        if best_metric > metric:
+            if config['early_stopping']:
                 es_pt_counter += 1
                 # early stopping check
                 if es_pt_counter >= config['es_patience']:
@@ -474,20 +476,23 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
                           "Val Prec: {:.4f}".format(precision_score(val_gt, best_val_preds, average='macro')),
                           "Val Rcll: {:.4f}".format(recall_score(val_gt, best_val_preds, average='macro')),
                           "Val F1: {:.4f}".format(f1_score(val_gt, best_val_preds, average='macro')))
-
-            else:
-                es_pt_counter = 0
-                best_network = network
-                best_loss = np.mean(val_losses)
-                best_train_losses = train_losses
-                best_train_preds = train_preds
-                best_val_losses = val_losses
-                best_val_preds = val_preds
         else:
+            print(f"Performance improved... ({best_metric}->{metric})")
+            if config['early_stopping']:
+                es_pt_counter = 0
+                best_train_losses = train_losses
+                best_val_losses = val_losses
+            best_metric = metric
             best_network = network
-            best_train_losses = train_losses
+            checkpoint = {
+                "model_state_dict": network.state_dict(),
+                "optim_state_dict": optimizer.state_dict(),
+                "criterion_state_dict": criterion.state_dict(),
+                "random_rnd_state": random.getstate(),
+                "numpy_rnd_state": np.random.get_state(),
+                "torch_rnd_state": torch.get_rng_state(),
+            }
             best_train_preds = train_preds
-            best_val_losses = val_losses
             best_val_preds = val_preds
 
         # set network to train mode again
@@ -499,10 +504,13 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
     # if plot_gradient gradient plot is shown at end of training
     if config['save_gradient_plot']:
         mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
-        plt.savefig(os.path.join('logs', log_date, log_timestamp, 'grad_flow.png'))
+        if config['name']:
+            plt.savefig(os.path.join('logs', log_date, log_timestamp, 'grad_flow_{}.png'.format(config['name'])))
+        else:
+            plt.savefig(os.path.join('logs', log_date, log_timestamp, 'grad_flow.png'))
 
     # return validation, train and test predictions as numpy array with ground truth
-    return best_network, np.vstack((best_val_preds, val_gt)).T, np.vstack((best_train_preds, train_gt)).T
+    return best_network, checkpoint, np.vstack((best_val_preds, val_gt)).T, np.vstack((best_train_preds, train_gt)).T
 
 
 def predict(test_features, test_labels, network, config, log_date, log_timestamp):
@@ -567,4 +575,9 @@ def predict(test_features, test_labels, network, config, log_date, log_timestamp
 
     if config['save_test_preds']:
         mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
-        np.save(os.path.join('logs', log_date, log_timestamp, 'test_preds.npy'), test_output.cpu().numpy())
+        if config['name']:
+            np.save(os.path.join('logs', log_date, log_timestamp, 'test_preds_{}.npy'.format(config['name'])),
+                    test_output.cpu().numpy())
+        else:
+            np.save(os.path.join('logs', log_date, log_timestamp, 'test_preds.npy'),
+                    test_output.cpu().numpy())

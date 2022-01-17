@@ -8,10 +8,13 @@
 import os
 
 import numpy as np
+import pandas as pd
+import torch
 from sklearn.metrics import jaccard_score, precision_score, recall_score, f1_score
 from sklearn.model_selection import StratifiedShuffleSplit, StratifiedKFold
 
 from data_processing.sliding_window import apply_sliding_window
+from misc.osutils import mkdir_if_missing
 from model.DeepConvLSTM import DeepConvLSTM
 from model.evaluate import evaluate_participant_scores
 from model.train import train, init_optimizer, init_loss, init_scheduler
@@ -102,9 +105,23 @@ def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_da
         else:
             scheduler = None
 
-        net, val_output, train_output = train(X_train, y_train, X_val, y_val,
-                                              network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
-                                              config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
+        net, checkpoint, val_output, train_output = train(X_train, y_train, X_val, y_val,
+                                                          network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
+                                                          config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
+
+        if args.save_checkpoints:
+            mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
+            print('Saving best checkpoint...')
+            if args.name:
+                torch.save(
+                    checkpoint,
+                    os.path.join('logs', log_date, log_timestamp, "user_{}_checkpoint_best_{}.pth".format(str(sbj), args.name))
+                )
+            else:
+                torch.save(
+                    checkpoint,
+                    os.path.join('logs', log_date, log_timestamp, "user_{}_checkpoint_best.pth".format(str(sbj)))
+                )
 
         if all_eval_output is None:
             all_eval_output = val_output
@@ -138,6 +155,31 @@ def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_da
         print(
             "Recall: {0}".format(recall_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
         print("F1: {0}".format(f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
+
+    if args.save_analysis:
+        mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
+        cp_score_acc = pd.DataFrame(cp_scores[0, :, :], index=None)
+        cp_score_acc.index = args.class_names
+        cp_score_prec = pd.DataFrame(cp_scores[1, :, :], index=None)
+        cp_score_prec.index = args.class_names
+        cp_score_rec = pd.DataFrame(cp_scores[2, :, :], index=None)
+        cp_score_rec.index = args.class_names
+        cp_score_f1 = pd.DataFrame(cp_scores[3, :, :], index=None)
+        cp_score_f1.index = args.class_names
+        tv_gap = pd.DataFrame(train_val_gap, index=None)
+        tv_gap.index = ['accuracy', 'precision', 'recall', 'f1']
+        if args.name:
+            cp_score_acc.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_acc_{}.csv'.format(args.name)))
+            cp_score_prec.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_prec_{}.csv').format(args.name))
+            cp_score_rec.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_rec_{}.csv').format(args.name))
+            cp_score_f1.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_f1_{}.csv').format(args.name))
+            tv_gap.to_csv(os.path.join('logs', log_date, log_timestamp, 'train_val_gap_{}.csv').format(args.name))
+        else:
+            cp_score_acc.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_acc.csv'))
+            cp_score_prec.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_prec.csv'))
+            cp_score_rec.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_rec.csv'))
+            cp_score_f1.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_f1.csv'))
+            tv_gap.to_csv(os.path.join('logs', log_date, log_timestamp, 'train_val_gap.csv'))
 
     evaluate_participant_scores(participant_scores=cp_scores,
                                 gen_gap_scores=train_val_gap,
@@ -248,9 +290,16 @@ def per_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_date
                 print('Adjusting learning rate according to scheduler: ' + args.lr_scheduler)
                 scheduler = init_scheduler(opt, args)
 
-            net, val_output, train_output = train(X_train, y_train, X_val, y_val,
-                                                  network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
-                                                  config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
+            net, checkpoint, val_output, train_output = train(X_train, y_train, X_val, y_val,
+                                                              network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
+                                                              config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
+
+            if args.save_checkpoints:
+                mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
+                print('Saving best checkpoint...')
+                torch.save(
+                    checkpoint, os.path.join('logs', log_date, log_timestamp, "split_{}_checkpoint_best.pth".format(str(j)))
+                )
 
             if all_eval_output is None:
                 all_eval_output = val_output
@@ -379,9 +428,16 @@ def train_valid_split(train_data, valid_data, custom_net, custom_loss, custom_op
     else:
         scheduler = None
 
-    net, val_output, train_output = train(X_train, y_train, X_val, y_val,
-                                          network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
-                                          config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
+    net, checkpoint, val_output, train_output = train(X_train, y_train, X_val, y_val,
+                                                      network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
+                                                      config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
+
+    if args.save_checkpoints:
+        mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
+        print('Saving best checkpoint...')
+        torch.save(
+            checkpoint, os.path.join('logs', log_date, log_timestamp, "checkpoint_best.pth")
+        )
 
     cls = np.array(range(args.nb_classes))
     print('VALIDATION RESULTS: ')
@@ -498,9 +554,16 @@ def k_fold(data, custom_net, custom_loss, custom_opt, args, log_date, log_timest
             print('Adjusting learning rate according to scheduler: ' + args.lr_scheduler)
             scheduler = init_scheduler(opt, args)
 
-        net, val_output, train_output = train(X_train, y_train, X_val, y_val,
-                                              network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
-                                              config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
+        net, checkpoint, val_output, train_output = train(X_train, y_train, X_val, y_val,
+                                                          network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
+                                                          config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
+
+        if args.save_checkpoints:
+            mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
+            print('Saving best checkpoint...')
+            torch.save(
+                checkpoint, os.path.join('logs', log_date, log_timestamp, "fold_{}_checkpoint_best.pth".format(str(j)))
+            )
 
         fold_acc = jaccard_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)
         fold_prec = precision_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)
