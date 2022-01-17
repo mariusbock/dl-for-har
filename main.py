@@ -266,7 +266,10 @@ def main(args):
             test = None
         train_val = np.concatenate((train, valid), axis=1)
 
-    print("Split datasets with size: | train {0} | valid {1} | test {2} |".format(train.shape, valid.shape, test.shape))
+    if args.cutoff_valid:
+        print("Split datasets with size: | train {0} | valid {1} | test {2} |".format(train.shape, valid.shape, test.shape))
+    else:
+        print("Split datasets with size: | train {0} | valid {1} |".format(train.shape, valid.shape))
 
     custom_net = None
     custom_loss = None
