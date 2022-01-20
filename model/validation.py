@@ -84,19 +84,15 @@ def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_da
 
         # optimizer initialization
         if args.optimizer != 'custom':
-                opt = init_optimizer(net, args)
-        elif args.optimizer == 'custom':
-            opt = custom_opt
+            opt = init_optimizer(net, args)
         else:
-            print("Did not provide a valid optimizer name!")
+            opt = custom_opt
 
         # optimizer initialization
         if args.loss != 'custom':
             loss = init_loss(args)
-        elif args.loss == 'custom':
-            loss = custom_loss
         else:
-            print("Did not provide a valid loss name!")
+            loss = custom_loss
 
         # lr scheduler initialization
         if args.adj_lr:

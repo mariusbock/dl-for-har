@@ -201,6 +201,9 @@ def init_loss(config):
         criterion = nn.CrossEntropyLoss(label_smoothing=config.smoothing)
     elif config.loss == 'maxup':
         return None
+    else:
+        print("Did not provide a valid loss name!")
+        return None
     return criterion
 
 
@@ -221,6 +224,9 @@ def init_optimizer(network, config):
         opt = torch.optim.Adam(network.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
     elif config.optimizer == 'rmsprop':
         opt = torch.optim.RMSprop(network.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
+    else:
+        print("Did not provide a valid optimizer name!")
+        return None
     return opt
 
 
@@ -237,6 +243,9 @@ def init_scheduler(optimizer, config):
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, config.lr_step, config.lr_decay)
     elif config.lr_scheduler == 'reduce_lr_on_plateau':
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=config.lr_step, factor=config.lr_decay)
+    else:
+        print("Did not provide a valid learning scheduler name!")
+        return None
     return scheduler
 
 
