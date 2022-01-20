@@ -21,7 +21,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from misc.osutils import mkdir_if_missing
-from misc.torchutils import count_parameters
+from misc.torchutils import count_parameters, seed_worker
 from model.DeepConvLSTM import ConvBlock, ConvBlockSkip, ConvBlockFixup
 
 
@@ -114,11 +114,12 @@ def init_weights(network):
     return network
 
 
-## Implementation inspired by https://github.com/JonasGeiping/data-poisoning/
-# see forest / data / mixing_data_augmentations.py
 class Maxup(torch.nn.Module):
-    """A meta-augmentation, returning the worst result from a range of augmentations.
+    """
+    A meta-augmentation, returning the worst result from a range of augmentations.
     As in the orignal paper, https://arxiv.org/abs/2002.09024,
+    Implementation inspired by https://github.com/JonasGeiping/data-poisoning/
+    see forest / data / mixing_data_augmentations.py
     """
 
     def __init__(self, given_data_augmentation, ntrials=4):
@@ -278,6 +279,7 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
     :return pytorch model, numpy array, numpy array
         Trained network and training and validation predictions with ground truth
     """
+    log_dir = os.path.join('logs', log_date, log_timestamp)
 
     # prints the number of learnable parameters in the network
     count_parameters(network)
@@ -310,11 +312,15 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
 
     # initialize training and validation dataset, define DataLoaders
     dataset = torch.utils.data.TensorDataset(torch.from_numpy(train_features), torch.from_numpy(train_labels))
-    trainloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=False,
-                             worker_init_fn=np.random.seed(int(config['seed'])))
+
+    g = torch.Generator()
+    g.manual_seed(config['seed'])
+
+    trainloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=config['shuffling'],
+                             worker_init_fn=seed_worker, generator=g, pin_memory=True)
     dataset = torch.utils.data.TensorDataset(torch.from_numpy(val_features), torch.from_numpy(val_labels))
     valloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=False,
-                           worker_init_fn=np.random.seed(int(config['seed'])))
+                           worker_init_fn=seed_worker, generator=g, pin_memory=True)
 
     # counters and objects used for early stopping and learning rate adjustment
     best_metric = 0.0
@@ -512,14 +518,26 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
 
     # if plot_gradient gradient plot is shown at end of training
     if config['save_gradient_plot']:
-        mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
+        mkdir_if_missing(log_dir)
         if config['name']:
-            plt.savefig(os.path.join('logs', log_date, log_timestamp, 'grad_flow_{}.png'.format(config['name'])))
+            plt.savefig(os.path.join(log_dir, 'grad_flow_{}.png'.format(config['name'])))
         else:
-            plt.savefig(os.path.join('logs', log_date, log_timestamp, 'grad_flow.png'))
+            plt.savefig(os.path.join(log_dir, 'grad_flow.png'))
 
     # return validation, train and test predictions as numpy array with ground truth
-    return best_network, checkpoint, np.vstack((best_val_preds, val_gt)).T, np.vstack((best_train_preds, train_gt)).T
+    if config['valid_epoch'] == 'best':
+        return best_network, checkpoint, np.vstack((best_val_preds, val_gt)).T, \
+               np.vstack((best_train_preds, train_gt)).T
+    else:
+        checkpoint = {
+            "model_state_dict": network.state_dict(),
+            "optim_state_dict": optimizer.state_dict(),
+            "criterion_state_dict": criterion.state_dict(),
+            "random_rnd_state": random.getstate(),
+            "numpy_rnd_state": np.random.get_state(),
+            "torch_rnd_state": torch.get_rng_state(),
+        }
+        return network, checkpoint, np.vstack((val_preds, val_gt)).T, np.vstack((train_preds, train_gt)).T
 
 
 def predict(test_features, test_labels, network, config, log_date, log_timestamp):
@@ -539,6 +557,8 @@ def predict(test_features, test_labels, network, config, log_date, log_timestamp
     :param log_timestamp: string
         Timestamp used for saving predictions
     """
+    log_dir = os.path.join('logs', log_date, log_timestamp)
+
     # set network to eval mode
     network.eval()
     # helper objects
@@ -569,7 +589,6 @@ def predict(test_features, test_labels, network, config, log_date, log_timestamp
             test_preds = np.concatenate((np.array(test_preds, int), np.array(y_preds, int)))
             test_gt = np.concatenate((np.array(test_gt, int), np.array(y_true, int)))
 
-    cls = np.array(range(config['nb_classes']))
     print('\nTEST RESULTS: ')
     print("Avg. Accuracy: {0}".format(jaccard_score(test_gt, test_preds, average='macro')))
     print("Avg. Precision: {0}".format(precision_score(test_gt, test_preds, average='macro')))
@@ -577,16 +596,14 @@ def predict(test_features, test_labels, network, config, log_date, log_timestamp
     print("Avg. F1: {0}".format(f1_score(test_gt, test_preds, average='macro')))
 
     print("\nTEST RESULTS (PER CLASS): ")
-    print("Accuracy: {0}".format(jaccard_score(test_gt, test_preds, average=None, labels=cls)))
-    print("Precision: {0}".format(precision_score(test_gt, test_preds, average=None, labels=cls)))
-    print("Recall: {0}".format(recall_score(test_gt, test_preds, average=None, labels=cls)))
-    print("F1: {0}".format(f1_score(test_gt, test_preds, average=None, labels=cls)))
+    print("Accuracy: {0}".format(jaccard_score(test_gt, test_preds, average=None)))
+    print("Precision: {0}".format(precision_score(test_gt, test_preds, average=None)))
+    print("Recall: {0}".format(recall_score(test_gt, test_preds, average=None)))
+    print("F1: {0}".format(f1_score(test_gt, test_preds, average=None)))
 
     if config['save_test_preds']:
-        mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
+        mkdir_if_missing(log_dir)
         if config['name']:
-            np.save(os.path.join('logs', log_date, log_timestamp, 'test_preds_{}.npy'.format(config['name'])),
-                    test_output.cpu().numpy())
+            np.save(os.path.join(log_dir, 'test_preds_{}.npy'.format(config['name'])), test_output.cpu().numpy())
         else:
-            np.save(os.path.join('logs', log_date, log_timestamp, 'test_preds.npy'),
-                    test_output.cpu().numpy())
+            np.save(os.path.join(log_dir, 'test_preds.npy'), test_output.cpu().numpy())

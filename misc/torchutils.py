@@ -19,14 +19,17 @@ def seed_torch(seed):
     :param seed: int
         Random seed to employ
     """
-    random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ":16:8"
-    np.random.seed(seed)
+    os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+
     torch.manual_seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
-    torch.backends.cudnn.benchmark = False
     torch.use_deterministic_algorithms(True)
 
 
@@ -45,3 +48,9 @@ def count_parameters(model):
         total_learn_params += param
     print(table)
     print(f"Total Params: {total_learn_params}")
+
+
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2 ** 32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)

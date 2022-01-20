@@ -1,4 +1,4 @@
-torch== 1.10.1
+torch==1.10.1
 numpy==1.21.5
 scikit-learn==1.0.2
 matplotlib==3.5.1

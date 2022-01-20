@@ -15,7 +15,7 @@ from sklearn.model_selection import train_test_split
 
 from data_processing.preprocess_data import load_dataset, compute_mean_and_std
 from data_processing.sliding_window import apply_sliding_window
-from model.validation import cross_participant_cv, per_participant_cv, train_valid_split, k_fold
+from model.validation import cross_participant_cv, train_valid_split, k_fold
 from model.train import predict
 
 from misc.logging import Logger
@@ -101,7 +101,8 @@ REDUCE_LAYER_OUTPUT = 8
 """
 TRAINING OPTIONS:
 - SEED: random seed which is to be employed
-- VALID_TYPE: (cross-)validation type; either 'cross-participant', 'per-participant', 'train-valid-split' or 'k-fold'
+- VALID_TYPE: (cross-)validation type; either 'cross-participant', 'split' or 'kfold'
+- VALID_EPOCH: which epoch used for evaluation; either 'best' or 'last'
 - BATCH_SIZE: size of the batches
 - EPOCHS: number of epochs during training
 - OPTIMIZER: optimizer to use; either 'rmsprop', 'adadelta' or 'adam'
@@ -115,6 +116,7 @@ TRAINING OPTIONS:
 - SPLITS_PP: number of stratified splits for each subject in per-participant evaluation
 - SIZE_PP:
 - WEIGHTED: boolean whether to use weighted loss calculation based on support of each class
+- SHUFFLING: boolean whether to use shuffling during training
 - ADJ_LR: boolean whether to adjust learning rate if no improvement
 - LR_SCHEDULER: type of learning rate scheduler to employ ('step_lr', 'reduce_lr_on_plateau')
 - LR_STEP: step size of learning rate scheduler (patience if plateau).
@@ -125,6 +127,7 @@ TRAINING OPTIONS:
 
 SEED = 1
 VALID_TYPE = 'cross-participant'
+VALID_EPOCH = 'best'
 BATCH_SIZE = 100
 EPOCHS = 30
 OPTIMIZER = 'adam'
@@ -138,6 +141,7 @@ SPLITS_KFOLD = 5
 SPLITS_PP = 5
 SIZE_PP = 0.6
 WEIGHTED = False
+SHUFFLING = False
 ADJ_LR = False
 LR_SCHEDULER = 'step_lr'
 LR_STEP = 10
@@ -169,6 +173,9 @@ SAVE_GRADIENT_PLOT = False
 
 
 def main(args):
+    # apply the chosen random seed to all relevant parts
+    seed_torch(args.seed)
+
     # check if valid prediction type chosen for dataset
     if args.dataset == 'opportunity' or args.dataset == 'opportunity_ordonez':
         if args.pred_type != 'gestures' and args.pred_type != 'locomotion':
@@ -214,15 +221,12 @@ def main(args):
 
     ############################################# TRAINING #############################################################
 
-    # apply the chosen random seed to all relevant parts
-    seed_torch(args.seed)
-
     # re-create full dataset for splitting purposes
     data = np.concatenate((X, (np.array(y)[:, None])), axis=1)
 
     # split data according to settings
     if args.dataset == 'opportunity_ordonez':
-        args.valid_type = 'train-valid-split'
+        args.valid_type = 'split'
         train = data[:497014, :]
         valid = data[497014:557963, :]
         test = data[557963:, :]
@@ -278,23 +282,21 @@ def main(args):
     # cross-validation; either cross-participant, per-participant or normal
     if args.valid_type == 'cross-participant':
         trained_net = cross_participant_cv(train_val, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp)
-    elif args.valid_type == 'per-participant':
-        trained_net = per_participant_cv(train_val, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp)
-    elif args.valid_type == 'train-valid-split':
+    elif args.valid_type == 'split':
         trained_net = train_valid_split(train, valid, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp)
-    elif args.valid_type == 'k-fold':
+    elif args.valid_type == 'kfold':
         trained_net = k_fold(train_val, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp)
     else:
         print('Did not choose a valid validation type dataset!')
         exit()
 
     ############################################# TESTING ##############################################################
-
-    if test.size != 0:
-        X_test, y_test = apply_sliding_window(test[:, :-1], test[:, -1],
-                                              args.sw_length, args.sw_unit, args.sampling_rate, args.sw_overlap)
-        X_test = X_test[:, :, 1:]
-        predict(X_test, y_test, trained_net, vars(args), log_date, log_timestamp)
+    if args.cutoff_valid:
+        if test.size != 0:
+            X_test, y_test = apply_sliding_window(test[:, :-1], test[:, -1],
+                                                  args.sw_length, args.sw_unit, args.sampling_rate, args.sw_overlap)
+            X_test = X_test[:, :, 1:]
+            predict(X_test, y_test, trained_net, vars(args), log_date, log_timestamp)
 
     # calculate time data creation took
     end = time.time()
@@ -326,6 +328,8 @@ if __name__ == '__main__':
                         help='Flag indicating to use reduce layer after convolutions')
     parser.add_argument('--weighted', default=WEIGHTED, action='store_true',
                         help='Flag indicating to use weighted loss')
+    parser.add_argument('--shuffling', default=WEIGHTED, action='store_true',
+                        help='Flag indicating to use shuffling during training')
     parser.add_argument('--pooling', default=POOLING, action='store_true',
                         help='Flag indicating to apply pooling after convolutions')
     parser.add_argument('--adj_lr', default=ADJ_LR, action='store_true',
@@ -355,9 +359,11 @@ if __name__ == '__main__':
                         help='Network to be used. Options: deepconvlstm. '
                              'Default: deepconvlstm')
     parser.add_argument('-vt', '--valid_type', default=VALID_TYPE, type=str,
-                        help='Validation type to be used. Options: per-participant, cross-participant, '
-                             'train-valid-split, k-fold). '
+                        help='Validation type to be used. Options: cross-participant, split, kfold. '
                              'Default: cross-participant')
+    parser.add_argument('-ve', '--valid_epoch', default=VALID_EPOCH, type=str,
+                        help='Which epoch to use for evaluation. Options: best, last'
+                             'Default: best')
     parser.add_argument('-swu', '--sw_unit', default=SW_UNIT, type=str,
                         help='sliding window unit used. Options: units, seconds.'
                              'Default: seconds')

@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import torch
 from sklearn.metrics import jaccard_score, precision_score, recall_score, f1_score
-from sklearn.model_selection import StratifiedShuffleSplit, StratifiedKFold
+from sklearn.model_selection import StratifiedKFold
 
 from data_processing.sliding_window import apply_sliding_window
 from misc.osutils import mkdir_if_missing
@@ -47,6 +47,7 @@ def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_da
     train_val_gap = np.zeros((4, int(np.max(data[:, 0]) + 1)))
     all_eval_output = None
     orig_lr = args.learning_rate
+    log_dir = os.path.join('logs', log_date, log_timestamp)
 
     for i, sbj in enumerate(np.unique(data[:, 0])):
         # for i, sbj in enumerate([0, 1]):
@@ -103,21 +104,23 @@ def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_da
 
         net, checkpoint, val_output, train_output = train(X_train, y_train, X_val, y_val,
                                                           network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
-                                                          config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
+                                                          config=vars(args), log_date=log_date,
+                                                          log_timestamp=log_timestamp)
 
         if args.save_checkpoints:
-            mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
-            print('Saving best checkpoint...')
-            if args.name:
-                torch.save(
-                    checkpoint,
-                    os.path.join('logs', log_date, log_timestamp, "user_{}_checkpoint_best_{}.pth".format(str(sbj), args.name))
-                )
+            mkdir_if_missing(log_dir)
+            print('Saving checkpoint...')
+            if args.valid_epoch == 'last':
+                if args.name:
+                    c_name = os.path.join(log_dir, "checkpoint_last_{}_{}.pth".format(str(sbj), str(args.name)))
+                else:
+                    c_name = os.path.join(log_dir, "checkpoint_last_{}.pth".format(str(sbj)))
             else:
-                torch.save(
-                    checkpoint,
-                    os.path.join('logs', log_date, log_timestamp, "user_{}_checkpoint_best.pth".format(str(sbj)))
-                )
+                if args.name:
+                    c_name = os.path.join(log_dir, "checkpoint_best_{}_{}.pth".format(str(sbj), str(args.name)))
+                else:
+                    c_name = os.path.join(log_dir, "checkpoint_best_{}.pth".format(str(sbj)))
+            torch.save(checkpoint, c_name)
 
         if all_eval_output is None:
             all_eval_output = val_output
@@ -125,13 +128,10 @@ def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_da
             all_eval_output = np.concatenate((all_eval_output, val_output), axis=0)
 
         # fill values for normal evaluation
-        cls = np.array(range(args.nb_classes))
-        cp_scores[0, :, int(sbj)] = jaccard_score(val_output[:, 1], val_output[:, 0], average=None,
-                                                  labels=cls)
-        cp_scores[1, :, int(sbj)] = precision_score(val_output[:, 1], val_output[:, 0], average=None,
-                                                    labels=cls)
-        cp_scores[2, :, int(sbj)] = recall_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)
-        cp_scores[3, :, int(sbj)] = f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)
+        cp_scores[0, :, int(sbj)] = jaccard_score(val_output[:, 1], val_output[:, 0], average=None)
+        cp_scores[1, :, int(sbj)] = precision_score(val_output[:, 1], val_output[:, 0], average=None)
+        cp_scores[2, :, int(sbj)] = recall_score(val_output[:, 1], val_output[:, 0], average=None)
+        cp_scores[3, :, int(sbj)] = f1_score(val_output[:, 1], val_output[:, 0], average=None)
 
         # fill values for train val gap evaluation
         train_val_gap[0, int(sbj)] = jaccard_score(train_output[:, 1], train_output[:, 0], average='macro') - \
@@ -144,16 +144,13 @@ def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_da
                                      f1_score(val_output[:, 1], val_output[:, 0], average='macro')
 
         print("SUBJECT {0} VALIDATION RESULTS: ".format(int(sbj) + 1))
-        print("Accuracy: {0}".format(
-            jaccard_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
-        print("Precision: {0}".format(
-            precision_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
-        print(
-            "Recall: {0}".format(recall_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
-        print("F1: {0}".format(f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
+        print("Accuracy: {0}".format(jaccard_score(val_output[:, 1], val_output[:, 0], average=None)))
+        print("Precision: {0}".format(precision_score(val_output[:, 1], val_output[:, 0], average=None)))
+        print("Recall: {0}".format(recall_score(val_output[:, 1], val_output[:, 0], average=None)))
+        print("F1: {0}".format(f1_score(val_output[:, 1], val_output[:, 0], average=None)))
 
     if args.save_analysis:
-        mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
+        mkdir_if_missing(log_dir)
         cp_score_acc = pd.DataFrame(cp_scores[0, :, :], index=None)
         cp_score_acc.index = args.class_names
         cp_score_prec = pd.DataFrame(cp_scores[1, :, :], index=None)
@@ -165,17 +162,17 @@ def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_da
         tv_gap = pd.DataFrame(train_val_gap, index=None)
         tv_gap.index = ['accuracy', 'precision', 'recall', 'f1']
         if args.name:
-            cp_score_acc.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_acc_{}.csv'.format(args.name)))
-            cp_score_prec.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_prec_{}.csv').format(args.name))
-            cp_score_rec.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_rec_{}.csv').format(args.name))
-            cp_score_f1.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_f1_{}.csv').format(args.name))
-            tv_gap.to_csv(os.path.join('logs', log_date, log_timestamp, 'train_val_gap_{}.csv').format(args.name))
+            cp_score_acc.to_csv(os.path.join(log_dir, 'cp_scores_acc_{}.csv'.format(args.name)))
+            cp_score_prec.to_csv(os.path.join(log_dir, 'cp_scores_prec_{}.csv').format(args.name))
+            cp_score_rec.to_csv(os.path.join(log_dir, 'cp_scores_rec_{}.csv').format(args.name))
+            cp_score_f1.to_csv(os.path.join(log_dir, 'cp_scores_f1_{}.csv').format(args.name))
+            tv_gap.to_csv(os.path.join(log_dir, 'train_val_gap_{}.csv').format(args.name))
         else:
-            cp_score_acc.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_acc.csv'))
-            cp_score_prec.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_prec.csv'))
-            cp_score_rec.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_rec.csv'))
-            cp_score_f1.to_csv(os.path.join('logs', log_date, log_timestamp, 'cp_scores_f1.csv'))
-            tv_gap.to_csv(os.path.join('logs', log_date, log_timestamp, 'train_val_gap.csv'))
+            cp_score_acc.to_csv(os.path.join(log_dir, 'cp_scores_acc.csv'))
+            cp_score_prec.to_csv(os.path.join(log_dir, 'cp_scores_prec.csv'))
+            cp_score_rec.to_csv(os.path.join(log_dir, 'cp_scores_rec.csv'))
+            cp_score_f1.to_csv(os.path.join(log_dir, 'cp_scores_f1.csv'))
+            tv_gap.to_csv(os.path.join(log_dir, 'train_val_gap.csv'))
 
     evaluate_participant_scores(participant_scores=cp_scores,
                                 gen_gap_scores=train_val_gap,
@@ -184,164 +181,6 @@ def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_da
                                 nb_subjects=int(np.max(data[:, 0]) + 1),
                                 filepath=os.path.join('logs', log_date, log_timestamp),
                                 filename='cross-participant',
-                                args=args
-                                )
-
-    return net
-
-
-def per_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp):
-    """
-    Method to apply per-participant cross-validation.
-
-    :param data: numpy array
-        Data used for applying cross-validation
-    :param custom_net: pytorch model
-        Custom network object
-    :param custom_loss: loss object
-        Custom loss object
-    :param custom_opt: optimizer object
-        Custom optimizer object
-    :param args: dict
-        Args object containing all relevant hyperparameters and settings
-    :param log_date: string
-        Date information needed for saving
-    :param log_timestamp: string
-        Timestamp information needed for saving
-    :return pytorch model
-        Trained network
-    """
-
-    print('\nCALCULATING PER-PARTICIPANT SCORES USING STRATIFIED SHUFFLE SPLIT.\n')
-    pp_scores = np.zeros((4, args.nb_classes, int(np.max(data[:, 0]) + 1)))
-    all_eval_output = None
-    train_val_gap = np.zeros((4, int(np.max(data[:, 0]) + 1)))
-    orig_lr = args.learning_rate
-
-    for i, sbj in enumerate(np.unique(data[:, 0])):
-        print('\n VALIDATING FOR SUBJECT {0} OF {1}'.format(int(sbj) + 1, int(np.max(data[:, 0])) + 1))
-
-        sss = StratifiedShuffleSplit(train_size=args.size_pp,
-                                     n_splits=args.splits_pp,
-                                     random_state=args.seed)
-
-        subject_data = data[data[:, 0] == sbj]
-
-        # sensor data is segmented using a sliding window mechanism
-        X, y = apply_sliding_window(subject_data[:, :-1], subject_data[:, -1],
-                                    sliding_window_size=args.sw_length,
-                                    unit=args.sw_unit,
-                                    sampling_rate=args.sampling_rate,
-                                    sliding_window_overlap=args.sw_overlap,
-                                    )
-
-        X = X[:, :, 1:]
-
-        classes = np.array(range(args.nb_classes))
-        subject_accuracy = np.zeros(args.nb_classes)
-        subject_precision = np.zeros(args.nb_classes)
-        subject_recall = np.zeros(args.nb_classes)
-        subject_f1 = np.zeros(args.nb_classes)
-
-        subject_accuracy_gap = 0
-        subject_precision_gap = 0
-        subject_recall_gap = 0
-        subject_f1_gap = 0
-        for j, (train_index, test_index) in enumerate(sss.split(X, y)):
-            print('SPLIT {0}/{1}'.format(j + 1, args.splits_pp))
-
-            X_train, X_val = X[train_index], X[test_index]
-            y_train, y_val = y[train_index], y[test_index]
-            args.learning_rate = orig_lr
-
-            args.window_size = X_train.shape[1]
-            args.nb_channels = X_train.shape[2]
-
-            # network initialization
-            if args.network == 'deepconvlstm':
-                net = DeepConvLSTM(config=vars(args))
-            elif args.network == 'custom':
-                net = custom_net
-            else:
-                print("Did not provide a valid network name!")
-
-            # optimizer initialization
-            if args.optimizer != 'custom':
-                opt = init_optimizer(net, args)
-            elif args.optimizer == 'custom':
-                opt = custom_opt
-            else:
-                print("Did not provide a valid optimizer name!")
-
-            # optimizer initialization
-            if args.loss != 'custom':
-                loss = init_loss(args)
-            elif args.loss == 'custom':
-                loss = custom_loss
-            else:
-                print("Did not provide a valid loss name!")
-
-            # lr scheduler initialization
-            if args.adj_lr:
-                print('Adjusting learning rate according to scheduler: ' + args.lr_scheduler)
-                scheduler = init_scheduler(opt, args)
-
-            net, checkpoint, val_output, train_output = train(X_train, y_train, X_val, y_val,
-                                                              network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
-                                                              config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
-
-            if args.save_checkpoints:
-                mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
-                print('Saving best checkpoint...')
-                torch.save(
-                    checkpoint, os.path.join('logs', log_date, log_timestamp, "split_{}_checkpoint_best.pth".format(str(j)))
-                )
-
-            if all_eval_output is None:
-                all_eval_output = val_output
-            else:
-                all_eval_output = np.concatenate((all_eval_output, val_output), axis=0)
-
-            subject_accuracy += jaccard_score(val_output[:, 1], val_output[:, 0], average=None,
-                                              labels=classes)
-            subject_precision += precision_score(val_output[:, 1], val_output[:, 0], average=None,
-                                                 labels=classes)
-            subject_recall += recall_score(val_output[:, 1], val_output[:, 0], average=None, labels=classes)
-            subject_f1 += f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=classes)
-
-            # add up train val gap evaluation
-            subject_accuracy_gap += jaccard_score(train_output[:, 1], train_output[:, 0], average='macro') - \
-                                    jaccard_score(val_output[:, 1], val_output[:, 0], average='macro')
-            subject_precision_gap += precision_score(train_output[:, 1], train_output[:, 0], average='macro') - \
-                                     precision_score(val_output[:, 1], val_output[:, 0], average='macro')
-            subject_recall_gap += recall_score(train_output[:, 1], train_output[:, 0], average='macro') - \
-                                  recall_score(val_output[:, 1], val_output[:, 0], average='macro')
-            subject_f1_gap += f1_score(train_output[:, 1], train_output[:, 0], average='macro') - \
-                              f1_score(val_output[:, 1], val_output[:, 0], average='macro')
-
-        pp_scores[0, :, int(sbj)] = subject_accuracy / args.splits_pp
-        pp_scores[1, :, int(sbj)] = subject_precision / args.splits_pp
-        pp_scores[2, :, int(sbj)] = subject_recall / args.splits_pp
-        pp_scores[3, :, int(sbj)] = subject_f1 / args.splits_pp
-
-        train_val_gap[0, int(sbj)] = subject_accuracy_gap / args.splits_pp
-        train_val_gap[1, int(sbj)] = subject_precision_gap / args.splits_pp
-        train_val_gap[2, int(sbj)] = subject_recall_gap / args.splits_pp
-        train_val_gap[3, int(sbj)] = subject_f1_gap / args.splits_pp
-
-        print("SUBJECT {0} VALIDATION RESULTS: ".format(int(sbj)))
-        print("Accuracy: {0}".format(pp_scores[0, :, int(sbj)]))
-        print("Precision: {0}".format(pp_scores[1, :, int(sbj)]))
-        print("Recall: {0}".format(pp_scores[2, :, int(sbj)]))
-        print("F1: {0}".format(pp_scores[3, :, int(sbj)]))
-
-    evaluate_participant_scores(participant_scores=pp_scores,
-                                gen_gap_scores=train_val_gap,
-                                input_cm=all_eval_output,
-                                class_names=args.class_names,
-                                nb_subjects=int(np.max(data[:, 0]) + 1),
-                                filepath=os.path.join('logs', log_date, log_timestamp),
-                                filename='per-participant',
                                 args=args
                                 )
 
@@ -372,6 +211,7 @@ def train_valid_split(train_data, valid_data, custom_net, custom_loss, custom_op
         Trained network
     """
     print('\nCALCULATING TRAIN-VALID-SPLIT SCORES.\n')
+    log_dir = os.path.join('logs', log_date, log_timestamp)
 
     # Sensor data is segmented using a sliding window mechanism
     X_train, y_train = apply_sliding_window(train_data[:, :-1], train_data[:, -1],
@@ -404,18 +244,14 @@ def train_valid_split(train_data, valid_data, custom_net, custom_loss, custom_op
     # optimizer initialization
     if args.optimizer != 'custom':
         opt = init_optimizer(net, args)
-    elif args.optimizer == 'custom':
-        opt = custom_opt
     else:
-        print("Did not provide a valid optimizer name!")
+        opt = custom_opt
 
     # optimizer initialization
     if args.loss != 'custom':
         loss = init_loss(args)
-    elif args.loss == 'custom':
-        loss = custom_loss
     else:
-        print("Did not provide a valid loss name!")
+        loss = custom_loss
 
     # lr scheduler initialization
     if args.adj_lr:
@@ -429,38 +265,61 @@ def train_valid_split(train_data, valid_data, custom_net, custom_loss, custom_op
                                                       config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
 
     if args.save_checkpoints:
-        mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
-        print('Saving best checkpoint...')
-        torch.save(
-            checkpoint, os.path.join('logs', log_date, log_timestamp, "checkpoint_best.pth")
-        )
+        mkdir_if_missing(log_dir)
+        print('Saving checkpoint...')
+        if args.valid_epoch == 'last':
+            if args.name:
+                c_name = os.path.join(log_dir, "checkpoint_last_{}.pth".format(str(args.name)))
+            else:
+                c_name = os.path.join(log_dir, "checkpoint_last.pth")
+        else:
+            if args.name:
+                c_name = os.path.join(log_dir, "checkpoint_best_{}.pth".format(str(args.name)))
+            else:
+                c_name = os.path.join(log_dir, "checkpoint_best.pth")
+        torch.save(checkpoint, c_name)
 
-    cls = np.array(range(args.nb_classes))
-    print('VALIDATION RESULTS: ')
-    print("Avg. Accuracy: {0}".format(jaccard_score(val_output[:, 1], val_output[:, 0], average='macro')))
-    print("Avg. Precision: {0}".format(precision_score(val_output[:, 1], val_output[:, 0], average='macro')))
-    print("Avg. Recall: {0}".format(recall_score(val_output[:, 1], val_output[:, 0], average='macro')))
-    print("Avg. F1: {0}".format(f1_score(val_output[:, 1], val_output[:, 0], average='macro')))
+    train_acc = jaccard_score(train_output[:, 1], train_output[:, 0], average=None)
+    train_prec = precision_score(train_output[:, 1], train_output[:, 0], average=None)
+    train_rcll = recall_score(train_output[:, 1], train_output[:, 0], average=None)
+    train_f1 = f1_score(train_output[:, 1], train_output[:, 0], average=None)
+
+    val_acc = jaccard_score(val_output[:, 1], val_output[:, 0], average=None)
+    val_prec = precision_score(val_output[:, 1], val_output[:, 0], average=None)
+    val_rcll = recall_score(val_output[:, 1], val_output[:, 0], average=None)
+    val_f1 = f1_score(val_output[:, 1], val_output[:, 0], average=None)
+
+    print('VALIDATION RESULTS (macro): ')
+    print("Avg. Accuracy: {0}".format(np.average(val_acc)))
+    print("Avg. Precision: {0}".format(np.average(val_prec)))
+    print("Avg. Recall: {0}".format(np.average(val_rcll)))
+    print("Avg. F1: {0}".format(np.average(val_f1)))
 
     print("VALIDATION RESULTS (PER CLASS): ")
-    print("Accuracy: {0}".format(jaccard_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
-    print("Precision: {0}".format(precision_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
-    print("Recall: {0}".format(recall_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
-    print("F1: {0}".format(f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)))
+    print("Accuracy: {0}".format(val_acc))
+    print("Precision: {0}".format(val_prec))
+    print("Recall: {0}".format(val_rcll))
+    print("F1: {0}".format(val_f1))
 
     print("GENERALIZATION GAP ANALYSIS: ")
-    print("Train-Val-Accuracy Difference: {0}".format(
-        jaccard_score(train_output[:, 1], train_output[:, 0], average='macro') -
-        jaccard_score(val_output[:, 1], val_output[:, 0], average='macro')))
-    print("Train-Val-Precision Difference: {0}".format(
-        precision_score(train_output[:, 1], train_output[:, 0], average='macro') -
-        precision_score(val_output[:, 1], val_output[:, 0], average='macro')))
-    print("Train-Val-Recall Difference: {0}".format(
-        recall_score(train_output[:, 1], train_output[:, 0], average='macro') -
-        recall_score(val_output[:, 1], val_output[:, 0], average='macro')))
-    print("Train-Val-F1 Difference: {0}".format(
-        f1_score(train_output[:, 1], train_output[:, 0], average='macro') -
-        f1_score(val_output[:, 1], val_output[:, 0], average='macro')))
+    print("Train-Val-Accuracy Difference: {0}".format(np.average(train_acc) - np.average(val_acc)))
+    print("Train-Val-Precision Difference: {0}".format(np.average(train_prec) - np.average(val_prec)))
+    print("Train-Val-Recall Difference: {0}".format(np.average(train_rcll) - np.average(val_rcll)))
+    print("Train-Val-F1 Difference: {0}".format(np.average(train_f1) - np.average(val_f1)))
+
+    if args.save_analysis:
+        mkdir_if_missing(log_dir)
+        tv_results = pd.DataFrame([val_acc, val_prec, val_rcll, val_f1], columns=args.class_names)
+        tv_results.index = ['accuracy', 'precision', 'recall', 'f1']
+        tv_gap = pd.DataFrame([train_acc - val_acc, train_prec - val_prec, train_rcll - val_rcll, train_f1 - val_f1],
+                              columns=args.class_names)
+        tv_gap.index = ['accuracy', 'precision', 'recall', 'f1']
+        if args.name:
+            tv_results.to_csv(os.path.join(log_dir, 'split_scores_{}.csv'.format(args.name)))
+            tv_gap.to_csv(os.path.join(log_dir, 'tv_gap_{}.csv'.format(args.name)))
+        else:
+            tv_results.to_csv(os.path.join(log_dir, 'split_scores.csv'))
+            tv_gap.to_csv(os.path.join(log_dir, 'tv_gap.csv'))
 
     return net
 
@@ -498,19 +357,20 @@ def k_fold(data, custom_net, custom_loss, custom_opt, args, log_date, log_timest
     X = X[:, :, 1:]
 
     orig_lr = args.learning_rate
+    log_dir = os.path.join('logs', log_date, log_timestamp)
 
     skf = StratifiedKFold(n_splits=args.splits_kfold, shuffle=True, random_state=args.seed)
 
-    cls = np.array(range(args.nb_classes))
-    kfold_accuracy = np.zeros(args.nb_classes)
-    kfold_precision = np.zeros(args.nb_classes)
-    kfold_recall = np.zeros(args.nb_classes)
-    kfold_f1 = np.zeros(args.nb_classes)
+    train_kfold_accuracy = np.zeros(args.nb_classes)
+    train_kfold_precision = np.zeros(args.nb_classes)
+    train_kfold_recall = np.zeros(args.nb_classes)
+    train_kfold_f1 = np.zeros(args.nb_classes)
 
-    kfold_accuracy_gap = 0
-    kfold_precision_gap = 0
-    kfold_recall_gap = 0
-    kfold_f1_gap = 0
+    val_kfold_accuracy = np.zeros(args.nb_classes)
+    val_kfold_precision = np.zeros(args.nb_classes)
+    val_kfold_recall = np.zeros(args.nb_classes)
+    val_kfold_f1 = np.zeros(args.nb_classes)
+
     for j, (train_index, test_index) in enumerate(skf.split(X, y)):
         print('FOLD {0}/{1}'.format(j + 1, args.splits_kfold))
 
@@ -532,18 +392,14 @@ def k_fold(data, custom_net, custom_loss, custom_opt, args, log_date, log_timest
         # optimizer initialization
         if args.optimizer != 'custom':
             opt = init_optimizer(net, args)
-        elif args.optimizer == 'custom':
-            opt = custom_opt
         else:
-            print("Did not provide a valid optimizer name!")
+            opt = custom_opt
 
         # optimizer initialization
         if args.loss != 'custom':
             loss = init_loss(args)
-        elif args.loss == 'custom':
-            loss = custom_loss
         else:
-            print("Did not provide a valid loss name!")
+            loss = custom_loss
 
         # lr scheduler initialization
         if args.adj_lr:
@@ -552,59 +408,88 @@ def k_fold(data, custom_net, custom_loss, custom_opt, args, log_date, log_timest
 
         net, checkpoint, val_output, train_output = train(X_train, y_train, X_val, y_val,
                                                           network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
-                                                          config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
+                                                          config=vars(args), log_date=log_date,
+                                                          log_timestamp=log_timestamp)
 
         if args.save_checkpoints:
-            mkdir_if_missing(os.path.join('logs', log_date, log_timestamp))
-            print('Saving best checkpoint...')
-            torch.save(
-                checkpoint, os.path.join('logs', log_date, log_timestamp, "fold_{}_checkpoint_best.pth".format(str(j)))
-            )
+            mkdir_if_missing(log_dir)
+            print('Saving checkpoint...')
+            if args.valid_epoch == 'last':
+                if args.name:
+                    c_name = os.path.join(log_dir, "checkpoint_last_{}_{}.pth".format(str(j), str(args.name)))
+                else:
+                    c_name = os.path.join(log_dir, "checkpoint_last_{}.pth".format(str(j)))
+            else:
+                if args.name:
+                    c_name = os.path.join(log_dir, "checkpoint_best_{}_{}.pth".format(str(j), str(args.name)))
+                else:
+                    c_name = os.path.join(log_dir, "checkpoint_best_{}.pth".format(str(j)))
+            torch.save(checkpoint, c_name)
 
-        fold_acc = jaccard_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)
-        fold_prec = precision_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)
-        fold_rec = recall_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)
-        fold_f1 = f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=cls)
+        train_fold_acc = jaccard_score(train_output[:, 1], train_output[:, 0], average=None)
+        train_fold_prec = precision_score(train_output[:, 1], train_output[:, 0], average=None)
+        train_fold_rec = recall_score(train_output[:, 1], train_output[:, 0], average=None)
+        train_fold_f1 = f1_score(train_output[:, 1], train_output[:, 0], average=None)
 
-        fold_acc_gap = jaccard_score(train_output[:, 1], train_output[:, 0], average='macro') - jaccard_score(val_output[:, 1], val_output[:, 0], average='macro')
-        fold_prec_gap = precision_score(train_output[:, 1], train_output[:, 0], average='macro') - precision_score(val_output[:, 1], val_output[:, 0], average='macro')
-        fold_rec_gap = recall_score(train_output[:, 1], train_output[:, 0], average='macro') - recall_score(val_output[:, 1], val_output[:, 0], average='macro')
-        fold_f1_gap = f1_score(train_output[:, 1], train_output[:, 0], average='macro') - f1_score(val_output[:, 1], val_output[:, 0], average='macro')
+        val_fold_acc = jaccard_score(val_output[:, 1], val_output[:, 0], average=None)
+        val_fold_prec = precision_score(val_output[:, 1], val_output[:, 0], average=None)
+        val_fold_rec = recall_score(val_output[:, 1], val_output[:, 0], average=None)
+        val_fold_f1 = f1_score(val_output[:, 1], val_output[:, 0], average=None)
 
-        print("\nFOLD {0} VALIDATION RESULTS: ".format(j + 1))
-        print("Accuracy: {0}".format(np.mean(fold_acc)))
-        print("Precision: {0}".format(np.mean(fold_prec)))
-        print("Recall: {0}".format(np.mean(fold_rec)))
-        print("F1: {0}".format(np.mean(fold_f1)))
+        print("\nFOLD {0} VALIDATION RESULTS (macro): ".format(j + 1))
+        print("Accuracy: {0}".format(np.mean(val_fold_acc)))
+        print("Precision: {0}".format(np.mean(val_fold_prec)))
+        print("Recall: {0}".format(np.mean(val_fold_rec)))
+        print("F1: {0}".format(np.mean(val_fold_f1)))
 
         # add up fold evaluation results
-        kfold_accuracy += fold_acc
-        kfold_precision += fold_prec
-        kfold_recall += fold_rec
-        kfold_f1 += fold_f1
+        train_kfold_accuracy += train_fold_acc
+        train_kfold_precision += train_fold_prec
+        train_kfold_recall += train_fold_rec
+        train_kfold_f1 += train_fold_f1
 
-        # add up train val gap evaluation
-        kfold_accuracy_gap += fold_acc_gap
-        kfold_precision_gap += fold_prec_gap
-        kfold_recall_gap += fold_rec_gap
-        kfold_f1_gap += fold_f1_gap
+        # add up fold evaluation results
+        val_kfold_accuracy += val_fold_acc
+        val_kfold_precision += val_fold_prec
+        val_kfold_recall += val_fold_rec
+        val_kfold_f1 += val_fold_f1
 
-    print("\nK-FOLD VALIDATION RESULTS: ")
-    print("Accuracy: {0}".format(np.mean(kfold_accuracy / args.splits_kfold)))
-    print("Precision: {0}".format(np.mean(kfold_precision / args.splits_kfold)))
-    print("Recall: {0}".format(np.mean(kfold_recall / args.splits_kfold)))
-    print("F1: {0}".format(np.mean(kfold_f1 / args.splits_kfold)))
+    print("\nK-FOLD VALIDATION RESULTS (macro):")
+    print("Accuracy: {0}".format(np.mean(val_kfold_accuracy / args.splits_kfold)))
+    print("Precision: {0}".format(np.mean(val_kfold_precision / args.splits_kfold)))
+    print("Recall: {0}".format(np.mean(val_kfold_recall / args.splits_kfold)))
+    print("F1: {0}".format(np.mean(val_kfold_f1 / args.splits_kfold)))
 
     print("\nVALIDATION RESULTS (PER CLASS): ")
-    print("Accuracy: {0}".format(kfold_accuracy / args.splits_kfold))
-    print("Precision: {0}".format(kfold_precision / args.splits_kfold))
-    print("Recall: {0}".format(kfold_recall / args.splits_kfold))
-    print("F1: {0}".format(kfold_f1 / args.splits_kfold))
+    print("Accuracy: {0}".format(val_kfold_accuracy / args.splits_kfold))
+    print("Precision: {0}".format(val_kfold_precision / args.splits_kfold))
+    print("Recall: {0}".format(val_kfold_recall / args.splits_kfold))
+    print("F1: {0}".format(val_kfold_f1 / args.splits_kfold))
 
     print("\nGENERALIZATION GAP ANALYSIS:")
-    print("Accuracy: {0}".format(kfold_accuracy_gap / args.splits_kfold))
-    print("Precision: {0}".format(kfold_precision_gap / args.splits_kfold))
-    print("Recall: {0}".format(kfold_recall_gap / args.splits_kfold))
-    print("F1: {0}".format(kfold_f1_gap / args.splits_kfold))
+    print("Accuracy: {0}".format((train_kfold_accuracy - val_kfold_accuracy) / args.splits_kfold))
+    print("Precision: {0}".format((train_kfold_precision - val_kfold_precision) / args.splits_kfold))
+    print("Recall: {0}".format((train_kfold_recall - val_kfold_recall) / args.splits_kfold))
+    print("F1: {0}".format((train_kfold_f1 - val_kfold_f1) / args.splits_kfold))
+
+    if args.save_analysis:
+        mkdir_if_missing(log_dir)
+        tv_results = pd.DataFrame([val_kfold_accuracy / args.splits_kfold,
+                                   val_kfold_precision / args.splits_kfold,
+                                   val_kfold_recall / args.splits_kfold,
+                                   val_kfold_f1 / args.splits_kfold], columns=args.class_names)
+        tv_results.index = ['accuracy', 'precision', 'recall', 'f1']
+        tv_gap = pd.DataFrame([(train_kfold_accuracy - val_kfold_accuracy) / args.splits_kfold,
+                               (train_kfold_precision - val_kfold_precision) / args.splits_kfold,
+                               (train_kfold_recall - val_kfold_recall) / args.splits_kfold,
+                               (train_kfold_f1 - val_kfold_f1) / args.splits_kfold],
+                              columns=args.class_names)
+        tv_gap.index = ['accuracy', 'precision', 'recall', 'f1']
+        if args.name:
+            tv_results.to_csv(os.path.join(log_dir, 'kfold_scores_{}.csv'.format(args.name)))
+            tv_gap.to_csv(os.path.join(log_dir, 'tv_gap_{}.csv'.format(args.name)))
+        else:
+            tv_results.to_csv(os.path.join(log_dir, 'kfold_scores.csv'))
+            tv_gap.to_csv(os.path.join(log_dir, 'tv_gap.csv'))
 
     return net
