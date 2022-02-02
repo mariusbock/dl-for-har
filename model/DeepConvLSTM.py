@@ -249,9 +249,9 @@ class DeepConvLSTM(nn.Module):
                 x, _ = lstm_layer(x)
             # reshape data for classifier
             x = x.view(-1, self.nb_units_lstm)
+        x = self.dropout(x)
         x = self.fc(x)
         # reshape data and return predicted label of last sample within final sequence (determines label of window)
-        x = self.dropout(x)
         out = x.view(-1, self.final_seq_len, self.nb_classes)
 
         return out[:, -1, :]
