@@ -48,7 +48,7 @@ def plot_confusion_matrix(input, target_names, title='Confusion matrix', cmap=No
     http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
 
     """
-    cm = confusion_matrix(input[:, 0], input[:, 1])
+    cm = confusion_matrix(input[:, 1], input[:, 0])
     accuracy = np.trace(cm) / float(np.sum(cm))
     misclass = 1 - accuracy
 
