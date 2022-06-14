@@ -5,3 +5,4 @@ matplotlib==3.5.1
 prettytable==3.0.0
 av==8.1.0
 pandas==1.1.5
+scipy==1.7.3

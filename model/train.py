@@ -607,3 +607,5 @@ def predict(test_features, test_labels, network, config, log_date, log_timestamp
             np.save(os.path.join(log_dir, 'test_preds_{}.npy'.format(config['name'])), test_output.cpu().numpy())
         else:
             np.save(os.path.join(log_dir, 'test_preds.npy'), test_output.cpu().numpy())
+
+    return test_preds, test_gt

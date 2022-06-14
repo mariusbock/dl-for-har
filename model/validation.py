@@ -16,7 +16,7 @@ from sklearn.model_selection import StratifiedKFold
 from data_processing.sliding_window import apply_sliding_window
 from misc.osutils import mkdir_if_missing
 from model.DeepConvLSTM import DeepConvLSTM
-from model.evaluate import evaluate_participant_scores
+from model.evaluate import evaluate_participant_scores, evaluate_split_scores
 from model.train import train, init_optimizer, init_loss, init_scheduler
 
 
@@ -320,6 +320,13 @@ def train_valid_split(train_data, valid_data, custom_net, custom_loss, custom_op
         else:
             tv_results.to_csv(os.path.join(log_dir, 'split_scores.csv'))
             tv_gap.to_csv(os.path.join(log_dir, 'tv_gap.csv'))
+
+    evaluate_split_scores(input_cm=val_output,
+                          class_names=args.class_names,
+                          filepath=os.path.join('logs', log_date, log_timestamp),
+                          filename='split',
+                          args=args
+                          )
 
     return net
 

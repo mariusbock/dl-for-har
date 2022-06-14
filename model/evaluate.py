@@ -214,3 +214,12 @@ def evaluate_participant_scores(participant_scores, gen_gap_scores, input_cm, cl
         plt.savefig(os.path.join(filepath, filename + '_bx.png'))
         plot_confusion_matrix(input_cm, class_names, normalize=False,
                               output_path=os.path.join(filepath, filename + '_cm.png'))
+
+def evaluate_split_scores(input_cm, class_names, filepath, filename, args):
+    mkdir_if_missing(filepath)
+    if args.name:
+        plot_confusion_matrix(input_cm, class_names, normalize=False,
+                              output_path=os.path.join(filepath, filename + '_cm_{}.png'.format(args.name)))
+    else:
+        plot_confusion_matrix(input_cm, class_names, normalize=False,
+                              output_path=os.path.join(filepath, filename + '_cm.png'))
