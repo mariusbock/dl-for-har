@@ -86,7 +86,8 @@ def plot_confusion_matrix(input, target_names, title='Confusion matrix', cmap=No
         plt.savefig(output_path)
 
 
-def evaluate_participant_scores(participant_scores, gen_gap_scores, input_cm, class_names, nb_subjects, filepath, filename, args):
+def evaluate_participant_scores(participant_scores, gen_gap_scores, input_cm, class_names, nb_subjects, filepath,
+                                filename, args):
     """
     Function which prints evaluation metrics of each participant, overall average and saves confusion matrix
 
@@ -190,36 +191,37 @@ def evaluate_participant_scores(participant_scores, gen_gap_scores, input_cm, cl
               'Recall {:.4f}, '.format(rcll),
               'F1-Score {:.4f}'.format(f1))
 
-    # create boxplots
-    fig, axs = plt.subplots(2, 2, figsize=(8, 8))
-    plt.suptitle('Average Participant Results', size=16)
-    axs[0, 0].set_title('Accuracy')
-    axs[0, 0].boxplot(participant_scores[0, :, :].T, labels=class_names, showmeans=True)
-    axs[0, 1].set_title('Precision')
-    axs[0, 1].boxplot(participant_scores[1, :, :].T, labels=class_names, showmeans=True)
-    axs[1, 0].set_title('Recall')
-    axs[1, 0].boxplot(participant_scores[2, :, :].T, labels=class_names, showmeans=True)
-    axs[1, 1].set_title('F1-Score')
-    axs[1, 1].boxplot(participant_scores[3, :, :].T, labels=class_names, showmeans=True)
-    for ax in fig.axes:
-        plt.sca(ax)
-        plt.xticks(rotation=90)
-    fig.subplots_adjust(hspace=0.5)
-    mkdir_if_missing(filepath)
-    if args.name:
-        plt.savefig(os.path.join(filepath, filename + '_bx_{}.png'.format(args.name)))
-        plot_confusion_matrix(input_cm, class_names, normalize=False,
-                              output_path=os.path.join(filepath, filename + '_cm_{}.png'.format(args.name)))
-    else:
-        plt.savefig(os.path.join(filepath, filename + '_bx.png'))
-        plot_confusion_matrix(input_cm, class_names, normalize=False,
-                              output_path=os.path.join(filepath, filename + '_cm.png'))
+    if args.logging:
+        # create boxplots
+        fig, axs = plt.subplots(2, 2, figsize=(8, 8))
+        plt.suptitle('Average Participant Results', size=16)
+        axs[0, 0].set_title('Accuracy')
+        axs[0, 0].boxplot(participant_scores[0, :, :].T, labels=class_names, showmeans=True)
+        axs[0, 1].set_title('Precision')
+        axs[0, 1].boxplot(participant_scores[1, :, :].T, labels=class_names, showmeans=True)
+        axs[1, 0].set_title('Recall')
+        axs[1, 0].boxplot(participant_scores[2, :, :].T, labels=class_names, showmeans=True)
+        axs[1, 1].set_title('F1-Score')
+        axs[1, 1].boxplot(participant_scores[3, :, :].T, labels=class_names, showmeans=True)
+        for ax in fig.axes:
+            plt.sca(ax)
+            plt.xticks(rotation=90)
+        fig.subplots_adjust(hspace=0.5)
+        if args.name:
+            plt.savefig(os.path.join(filepath, filename + '_bx_{}.png'.format(args.name)))
+            plot_confusion_matrix(input_cm, class_names, normalize=False,
+                                  output_path=os.path.join(filepath, filename + '_cm_{}.png'.format(args.name)))
+        else:
+            plt.savefig(os.path.join(filepath, filename + '_bx.png'))
+            plot_confusion_matrix(input_cm, class_names, normalize=False,
+                                  output_path=os.path.join(filepath, filename + '_cm.png'))
+
 
 def evaluate_split_scores(input_cm, class_names, filepath, filename, args):
-    mkdir_if_missing(filepath)
-    if args.name:
-        plot_confusion_matrix(input_cm, class_names, normalize=False,
-                              output_path=os.path.join(filepath, filename + '_cm_{}.png'.format(args.name)))
-    else:
-        plot_confusion_matrix(input_cm, class_names, normalize=False,
-                              output_path=os.path.join(filepath, filename + '_cm.png'))
+    if args.logging:
+        if args.name:
+            plot_confusion_matrix(input_cm, class_names, normalize=False,
+                                  output_path=os.path.join(filepath, filename + '_cm_{}.png'.format(args.name)))
+        else:
+            plot_confusion_matrix(input_cm, class_names, normalize=False,
+                                  output_path=os.path.join(filepath, filename + '_cm.png'))

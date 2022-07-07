@@ -20,7 +20,7 @@ from model.evaluate import evaluate_participant_scores, evaluate_split_scores
 from model.train import train, init_optimizer, init_loss, init_scheduler
 
 
-def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp):
+def cross_participant_cv(data, args, log_dir=None, custom_net=None, custom_loss=None, custom_opt=None):
     """
     Method to apply cross-participant cross-validation (also known as leave-one-subject-out cross-validation).
 
@@ -34,27 +34,23 @@ def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_da
         Custom optimizer object
     :param args: dict
         Args object containing all relevant hyperparameters and settings
-    :param log_date: string
-        Date information needed for saving
-    :param log_timestamp: string
-        Timestamp information needed for saving
+    :param log_dir: string
+        Logging directory
     :return pytorch model
         Trained network
     """
-
     print('\nCALCULATING CROSS-PARTICIPANT SCORES USING LOSO CV.\n')
     cp_scores = np.zeros((4, args.nb_classes, int(np.max(data[:, 0]) + 1)))
     train_val_gap = np.zeros((4, int(np.max(data[:, 0]) + 1)))
     all_eval_output = None
     orig_lr = args.learning_rate
-    log_dir = os.path.join('logs', log_date, log_timestamp)
 
     for i, sbj in enumerate(np.unique(data[:, 0])):
-        # for i, sbj in enumerate([0, 1]):
         print('\n VALIDATING FOR SUBJECT {0} OF {1}'.format(int(sbj) + 1, int(np.max(data[:, 0])) + 1))
         train_data = data[data[:, 0] != sbj]
         val_data = data[data[:, 0] == sbj]
         args.learning_rate = orig_lr
+
         # Sensor data is segmented using a sliding window mechanism
         X_train, y_train = apply_sliding_window(train_data[:, :-1], train_data[:, -1],
                                                 sliding_window_size=args.sw_length,
@@ -104,11 +100,10 @@ def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_da
 
         net, checkpoint, val_output, train_output = train(X_train, y_train, X_val, y_val,
                                                           network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
-                                                          config=vars(args), log_date=log_date,
-                                                          log_timestamp=log_timestamp)
+                                                          config=vars(args), log_dir=log_dir
+                                                          )
 
         if args.save_checkpoints:
-            mkdir_if_missing(log_dir)
             print('Saving checkpoint...')
             if args.valid_epoch == 'last':
                 if args.name:
@@ -128,29 +123,29 @@ def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_da
             all_eval_output = np.concatenate((all_eval_output, val_output), axis=0)
 
         # fill values for normal evaluation
-        cp_scores[0, :, int(sbj)] = jaccard_score(val_output[:, 1], val_output[:, 0], average=None)
-        cp_scores[1, :, int(sbj)] = precision_score(val_output[:, 1], val_output[:, 0], average=None)
-        cp_scores[2, :, int(sbj)] = recall_score(val_output[:, 1], val_output[:, 0], average=None)
-        cp_scores[3, :, int(sbj)] = f1_score(val_output[:, 1], val_output[:, 0], average=None)
+        labels = list(range(0, args.nb_classes))
+        cp_scores[0, :, int(sbj)] = jaccard_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)
+        cp_scores[1, :, int(sbj)] = precision_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)
+        cp_scores[2, :, int(sbj)] = recall_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)
+        cp_scores[3, :, int(sbj)] = f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)
 
         # fill values for train val gap evaluation
-        train_val_gap[0, int(sbj)] = jaccard_score(train_output[:, 1], train_output[:, 0], average='macro') - \
-                                     jaccard_score(val_output[:, 1], val_output[:, 0], average='macro')
-        train_val_gap[1, int(sbj)] = precision_score(train_output[:, 1], train_output[:, 0], average='macro') - \
-                                     precision_score(val_output[:, 1], val_output[:, 0], average='macro')
-        train_val_gap[2, int(sbj)] = recall_score(train_output[:, 1], train_output[:, 0], average='macro') - \
-                                     recall_score(val_output[:, 1], val_output[:, 0], average='macro')
-        train_val_gap[3, int(sbj)] = f1_score(train_output[:, 1], train_output[:, 0], average='macro') - \
-                                     f1_score(val_output[:, 1], val_output[:, 0], average='macro')
+        train_val_gap[0, int(sbj)] = jaccard_score(train_output[:, 1], train_output[:, 0], average='macro', labels=labels) - \
+                                     jaccard_score(val_output[:, 1], val_output[:, 0], average='macro', labels=labels)
+        train_val_gap[1, int(sbj)] = precision_score(train_output[:, 1], train_output[:, 0], average='macro', labels=labels) - \
+                                     precision_score(val_output[:, 1], val_output[:, 0], average='macro', labels=labels)
+        train_val_gap[2, int(sbj)] = recall_score(train_output[:, 1], train_output[:, 0], average='macro', labels=labels) - \
+                                     recall_score(val_output[:, 1], val_output[:, 0], average='macro', labels=labels)
+        train_val_gap[3, int(sbj)] = f1_score(train_output[:, 1], train_output[:, 0], average='macro', labels=labels) - \
+                                     f1_score(val_output[:, 1], val_output[:, 0], average='macro', labels=labels)
 
         print("SUBJECT {0} VALIDATION RESULTS: ".format(int(sbj) + 1))
-        print("Accuracy: {0}".format(jaccard_score(val_output[:, 1], val_output[:, 0], average=None)))
-        print("Precision: {0}".format(precision_score(val_output[:, 1], val_output[:, 0], average=None)))
-        print("Recall: {0}".format(recall_score(val_output[:, 1], val_output[:, 0], average=None)))
-        print("F1: {0}".format(f1_score(val_output[:, 1], val_output[:, 0], average=None)))
+        print("Accuracy: {0}".format(jaccard_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)))
+        print("Precision: {0}".format(precision_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)))
+        print("Recall: {0}".format(recall_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)))
+        print("F1: {0}".format(f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)))
 
     if args.save_analysis:
-        mkdir_if_missing(log_dir)
         cp_score_acc = pd.DataFrame(cp_scores[0, :, :], index=None)
         cp_score_acc.index = args.class_names
         cp_score_prec = pd.DataFrame(cp_scores[1, :, :], index=None)
@@ -179,7 +174,7 @@ def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_da
                                 input_cm=all_eval_output,
                                 class_names=args.class_names,
                                 nb_subjects=int(np.max(data[:, 0]) + 1),
-                                filepath=os.path.join('logs', log_date, log_timestamp),
+                                filepath=log_dir,
                                 filename='cross-participant',
                                 args=args
                                 )
@@ -187,7 +182,7 @@ def cross_participant_cv(data, custom_net, custom_loss, custom_opt, args, log_da
     return net
 
 
-def train_valid_split(train_data, valid_data, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp):
+def train_valid_split(train_data, valid_data, args, log_dir=None, custom_net=None, custom_loss=None, custom_opt=None):
     """
     Method to apply normal cross-validation, i.e. one set split into train, validation and testing data.
 
@@ -203,16 +198,12 @@ def train_valid_split(train_data, valid_data, custom_net, custom_loss, custom_op
         Custom optimizer object
     :param args: dict
         Args object containing all relevant hyperparameters and settings
-    :param log_date: string
-        Date information needed for saving
-    :param log_timestamp: string
-        Timestamp information needed for saving
+    :param log_dir: string
+        Logging directory
     :return pytorch model
         Trained network
     """
     print('\nCALCULATING TRAIN-VALID-SPLIT SCORES.\n')
-    log_dir = os.path.join('logs', log_date, log_timestamp)
-
     # Sensor data is segmented using a sliding window mechanism
     X_train, y_train = apply_sliding_window(train_data[:, :-1], train_data[:, -1],
                                             sliding_window_size=args.sw_length,
@@ -262,10 +253,10 @@ def train_valid_split(train_data, valid_data, custom_net, custom_loss, custom_op
 
     net, checkpoint, val_output, train_output = train(X_train, y_train, X_val, y_val,
                                                       network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
-                                                      config=vars(args), log_date=log_date, log_timestamp=log_timestamp)
+                                                      config=vars(args), log_dir=log_dir
+                                                      )
 
     if args.save_checkpoints:
-        mkdir_if_missing(log_dir)
         print('Saving checkpoint...')
         if args.valid_epoch == 'last':
             if args.name:
@@ -279,15 +270,16 @@ def train_valid_split(train_data, valid_data, custom_net, custom_loss, custom_op
                 c_name = os.path.join(log_dir, "checkpoint_best.pth")
         torch.save(checkpoint, c_name)
 
-    train_acc = jaccard_score(train_output[:, 1], train_output[:, 0], average=None)
-    train_prec = precision_score(train_output[:, 1], train_output[:, 0], average=None)
-    train_rcll = recall_score(train_output[:, 1], train_output[:, 0], average=None)
-    train_f1 = f1_score(train_output[:, 1], train_output[:, 0], average=None)
+    labels = list(range(0, args.nb_classes))
+    train_acc = jaccard_score(train_output[:, 1], train_output[:, 0], average=None, labels=labels)
+    train_prec = precision_score(train_output[:, 1], train_output[:, 0], average=None, labels=labels)
+    train_rcll = recall_score(train_output[:, 1], train_output[:, 0], average=None, labels=labels)
+    train_f1 = f1_score(train_output[:, 1], train_output[:, 0], average=None, labels=labels)
 
-    val_acc = jaccard_score(val_output[:, 1], val_output[:, 0], average=None)
-    val_prec = precision_score(val_output[:, 1], val_output[:, 0], average=None)
-    val_rcll = recall_score(val_output[:, 1], val_output[:, 0], average=None)
-    val_f1 = f1_score(val_output[:, 1], val_output[:, 0], average=None)
+    val_acc = jaccard_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)
+    val_prec = precision_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)
+    val_rcll = recall_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)
+    val_f1 = f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)
 
     print('VALIDATION RESULTS (macro): ')
     print("Avg. Accuracy: {0}".format(np.average(val_acc)))
@@ -308,7 +300,6 @@ def train_valid_split(train_data, valid_data, custom_net, custom_loss, custom_op
     print("Train-Val-F1 Difference: {0}".format(np.average(train_f1) - np.average(val_f1)))
 
     if args.save_analysis:
-        mkdir_if_missing(log_dir)
         tv_results = pd.DataFrame([val_acc, val_prec, val_rcll, val_f1], columns=args.class_names)
         tv_results.index = ['accuracy', 'precision', 'recall', 'f1']
         tv_gap = pd.DataFrame([train_acc - val_acc, train_prec - val_prec, train_rcll - val_rcll, train_f1 - val_f1],
@@ -323,15 +314,14 @@ def train_valid_split(train_data, valid_data, custom_net, custom_loss, custom_op
 
     evaluate_split_scores(input_cm=val_output,
                           class_names=args.class_names,
-                          filepath=os.path.join('logs', log_date, log_timestamp),
+                          filepath=log_dir,
                           filename='split',
                           args=args
                           )
-
     return net
 
 
-def k_fold(data, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp):
+def k_fold(data, custom_net, custom_loss, custom_opt, args, log_dir):
     """
     Method to apply k-fold cross-validation.
 
@@ -345,10 +335,8 @@ def k_fold(data, custom_net, custom_loss, custom_opt, args, log_date, log_timest
         Custom optimizer object
     :param args: dict
         Args object containing all relevant hyperparameters and settings
-    :param log_date: string
-        Date information needed for saving
-    :param log_timestamp: string
-        Timestamp information needed for saving
+    :param log_dir: string
+        Logging directory
     :return pytorch model
         Trained network
     """
@@ -364,8 +352,6 @@ def k_fold(data, custom_net, custom_loss, custom_opt, args, log_date, log_timest
     X = X[:, :, 1:]
 
     orig_lr = args.learning_rate
-    log_dir = os.path.join('logs', log_date, log_timestamp)
-
     skf = StratifiedKFold(n_splits=args.splits_kfold, shuffle=True, random_state=args.seed)
 
     train_kfold_accuracy = np.zeros(args.nb_classes)
@@ -415,11 +401,10 @@ def k_fold(data, custom_net, custom_loss, custom_opt, args, log_date, log_timest
 
         net, checkpoint, val_output, train_output = train(X_train, y_train, X_val, y_val,
                                                           network=net, optimizer=opt, loss=loss, lr_scheduler=scheduler,
-                                                          config=vars(args), log_date=log_date,
-                                                          log_timestamp=log_timestamp)
+                                                          config=vars(args), log_dir=log_dir
+                                                          )
 
         if args.save_checkpoints:
-            mkdir_if_missing(log_dir)
             print('Saving checkpoint...')
             if args.valid_epoch == 'last':
                 if args.name:
@@ -433,15 +418,16 @@ def k_fold(data, custom_net, custom_loss, custom_opt, args, log_date, log_timest
                     c_name = os.path.join(log_dir, "checkpoint_best_{}.pth".format(str(j)))
             torch.save(checkpoint, c_name)
 
-        train_fold_acc = jaccard_score(train_output[:, 1], train_output[:, 0], average=None)
-        train_fold_prec = precision_score(train_output[:, 1], train_output[:, 0], average=None)
-        train_fold_rec = recall_score(train_output[:, 1], train_output[:, 0], average=None)
-        train_fold_f1 = f1_score(train_output[:, 1], train_output[:, 0], average=None)
+        labels = list(range(0, args.nb_classes))
+        train_fold_acc = jaccard_score(train_output[:, 1], train_output[:, 0], average=None, labels=labels)
+        train_fold_prec = precision_score(train_output[:, 1], train_output[:, 0], average=None, labels=labels)
+        train_fold_rec = recall_score(train_output[:, 1], train_output[:, 0], average=None, labels=labels)
+        train_fold_f1 = f1_score(train_output[:, 1], train_output[:, 0], average=None, labels=labels)
 
-        val_fold_acc = jaccard_score(val_output[:, 1], val_output[:, 0], average=None)
-        val_fold_prec = precision_score(val_output[:, 1], val_output[:, 0], average=None)
-        val_fold_rec = recall_score(val_output[:, 1], val_output[:, 0], average=None)
-        val_fold_f1 = f1_score(val_output[:, 1], val_output[:, 0], average=None)
+        val_fold_acc = jaccard_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)
+        val_fold_prec = precision_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)
+        val_fold_rec = recall_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)
+        val_fold_f1 = f1_score(val_output[:, 1], val_output[:, 0], average=None, labels=labels)
 
         print("\nFOLD {0} VALIDATION RESULTS (macro): ".format(j + 1))
         print("Accuracy: {0}".format(np.mean(val_fold_acc)))
@@ -480,7 +466,6 @@ def k_fold(data, custom_net, custom_loss, custom_opt, args, log_date, log_timest
     print("F1: {0}".format((train_kfold_f1 - val_kfold_f1) / args.splits_kfold))
 
     if args.save_analysis:
-        mkdir_if_missing(log_dir)
         tv_results = pd.DataFrame([val_kfold_accuracy / args.splits_kfold,
                                    val_kfold_precision / args.splits_kfold,
                                    val_kfold_recall / args.splits_kfold,

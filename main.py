@@ -15,6 +15,7 @@ from sklearn.model_selection import train_test_split
 
 from data_processing.preprocess_data import load_dataset, compute_mean_and_std
 from data_processing.sliding_window import apply_sliding_window
+from misc.osutils import mkdir_if_missing
 from model.validation import cross_participant_cv, train_valid_split, k_fold
 from model.train import predict
 
@@ -53,13 +54,13 @@ DATASET OPTIONS:
 DATASET = 'rwhar'
 PRED_TYPE = 'gestures'
 CUTOFF_TYPE = 'subject'
-CUTOFF_TRAIN = 10
+CUTOFF_TRAIN = 6
 CUTOFF_VALID = None
 SW_LENGTH = 1
 SW_UNIT = 'seconds'
 SW_OVERLAP = 60
 MEANS_AND_STDS = False
-INCLUDE_NULL = True
+INCLUDE_NULL = False
 
 """
 NETWORK OPTIONS:
@@ -171,6 +172,14 @@ SAVE_CHECKPOINTS = False
 SAVE_ANALYSIS = False
 SAVE_GRADIENT_PLOT = False
 
+"""
+IF YOU WANT TO USE A CUSTOM NETWORK, LOSS AND/ OR OPTIMIZER DEFINE THEM HERE
+"""
+
+CUSTOM_NET = None
+CUSTOM_LOSS = None
+CUSTOM_OPT = None
+
 
 def main(args):
     # apply the chosen random seed to all relevant parts
@@ -191,12 +200,18 @@ def main(args):
     log_date = time.strftime('%Y%m%d')
     log_timestamp = time.strftime('%H%M%S')
 
+    if args.logging or args.save_analysis or args.save_checkpoints or args.save_test_preds or args.save_gradient_plot:
+        log_dir = os.path.join('logs', log_date, log_timestamp)
+        mkdir_if_missing(log_dir)
+    else:
+        log_dir = None
+
     # saves logs to a file (standard output redirected)
     if args.logging:
         if args.name:
-            sys.stdout = Logger(os.path.join('logs', log_date, log_timestamp, 'log_{}.txt'.format(args.name)))
+            sys.stdout = Logger(os.path.join(log_dir, 'log_{}.txt'.format(args.name)))
         else:
-            sys.stdout = Logger(os.path.join('logs', log_date, log_timestamp, 'log.txt'))
+            sys.stdout = Logger(os.path.join(log_dir, 'log.txt'))
 
     print('Applied settings: ')
     print(args)
@@ -275,17 +290,13 @@ def main(args):
     else:
         print("Split datasets with size: | train {0} | valid {1} |".format(train.shape, valid.shape))
 
-    custom_net = None
-    custom_loss = None
-    custom_opt = None
-
     # cross-validation; either cross-participant, per-participant or normal
     if args.valid_type == 'cross-participant':
-        trained_net = cross_participant_cv(train_val, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp)
+        trained_net = cross_participant_cv(train_val, args, log_dir, CUSTOM_NET, CUSTOM_LOSS, CUSTOM_OPT)
     elif args.valid_type == 'split':
-        trained_net = train_valid_split(train, valid, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp)
+        trained_net = train_valid_split(train, valid, args, log_dir, CUSTOM_NET, CUSTOM_LOSS, CUSTOM_OPT)
     elif args.valid_type == 'kfold':
-        trained_net = k_fold(train_val, custom_net, custom_loss, custom_opt, args, log_date, log_timestamp)
+        trained_net = k_fold(train_val, args, log_dir, CUSTOM_NET, CUSTOM_LOSS, CUSTOM_OPT)
     else:
         print('Did not choose a valid validation type dataset!')
         exit()
@@ -296,7 +307,7 @@ def main(args):
             X_test, y_test = apply_sliding_window(test[:, :-1], test[:, -1],
                                                   args.sw_length, args.sw_unit, args.sampling_rate, args.sw_overlap)
             X_test = X_test[:, :, 1:]
-            predict(X_test, y_test, trained_net, vars(args), log_date, log_timestamp)
+            predict(X_test, y_test, trained_net, vars(args), log_dir)
 
     # calculate time data creation took
     end = time.time()

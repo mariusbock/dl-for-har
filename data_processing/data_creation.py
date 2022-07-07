@@ -14,8 +14,47 @@ from glob import glob
 import os
 from io import BytesIO
 import zipfile
-
+from scipy.signal import butter, lfilter
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 pd.options.mode.chained_assignment = None
+
+
+def butter_lowpass(cutoff, fs, order=5):
+    nyq = 0.5 * fs
+    normal_cutoff = cutoff / nyq
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    return b, a
+
+
+def butter_lowpass_filter(data, cutoff, fs, order=5):
+    b, a = butter_lowpass(cutoff, fs, order=order)
+    y = lfilter(b, a, data, axis=0)
+    return y
+
+
+def downsample(data_x, data_y, fs, factor):
+    """
+    Under construction.
+    """
+
+    x_cols = data_x.columns
+    data_x = data_x.to_numpy()
+    y_name = data_y.name
+    data_y = data_y.to_numpy()
+
+    cutoff = fs / (factor * 2)
+
+    init_shapes = (data_x.shape, data_y.shape)
+
+    data_x = butter_lowpass_filter(data_x, cutoff, fs)
+    data_x = data_x[::factor]
+    data_y = data_y[::factor]
+
+    print(f'Downsampled data from {init_shapes[0]} samples @ {fs}Hz => {data_x.shape} samples @ {fs/factor:.2f}Hz')
+    print(f'Downsampled labels from {init_shapes[1]} labels @ {fs}Hz => {data_y.shape} samples @ {fs/factor:.2f}Hz')
+
+    return pd.DataFrame(data_x, columns=x_cols), pd.Series(data_y, name=y_name)
 
 
 def milliseconds_to_hertz(start, end, rate):
@@ -178,11 +217,48 @@ def create_hhar_dataset(raw_dir, save_dir):
     }
 
     data = data.replace({"User": user_dict})
-
-    data = data[['User', 'x', 'y', 'z', 'gt']]
     data = data.fillna('null_class')
+    gear_data = data[data['Model'] == 'gear']
+    lgwatch_data = data[data['Model'] == 'lgwatch']
 
-    data.to_csv(os.path.join(save_dir, 'hhar_data.csv'), index=False, header=False)
+    gear_data = gear_data[['User', 'Device', 'x', 'y', 'z', 'gt']]
+    lgwatch_data = lgwatch_data[['User', 'Device', 'x', 'y', 'z', 'gt']]
+    output = None
+    for i in np.unique(lgwatch_data['User']):
+        gear_usr_data = gear_data[gear_data['User'] == i]
+        lg_usr_data = lgwatch_data[lgwatch_data['User'] == i]
+        gear_usr_output = None
+        for d in np.unique(gear_usr_data['Device']):
+            gear_usr_d_data = gear_usr_data[gear_usr_data['Device'] == d][['User', 'x', 'y', 'z', 'gt']]
+            print(gear_usr_d_data.shape)
+            if gear_usr_output is None:
+                gear_usr_output = gear_usr_d_data
+            else:
+                gear_usr_output = np.concatenate((gear_usr_output, gear_usr_d_data), axis=0)
+        lg_usr_output = None
+        for d in np.unique(lg_usr_data['Device']):
+            lg_usr_d_data = lg_usr_data[lg_usr_data['Device'] == d]
+            x, y = downsample(lg_usr_d_data[['x', 'y', 'z']], lg_usr_d_data['gt'], 200, 2)
+            lg_usr_d_data = np.concatenate((np.full((len(x), 1), i), x, y[:, None]), axis=1)
+            if len(y) == 1:
+                print("Data will be excluded; false recording!")
+                continue
+            if lg_usr_output is None:
+                lg_usr_output = lg_usr_d_data
+            else:
+                lg_usr_output = np.concatenate((lg_usr_output, lg_usr_d_data), axis=0)
+        if gear_usr_output is None:
+            if output is None:
+                output = lg_usr_output
+            else:
+                output = np.concatenate((output, lg_usr_output))
+        else:
+            if output is None:
+                output = np.concatenate((gear_usr_output, lg_usr_output))
+            else:
+                output = np.concatenate((output, np.concatenate((gear_usr_output, lg_usr_output))))
+    output = pd.DataFrame(output, index=None)
+    output.to_csv(os.path.join(save_dir, 'hhar_data.csv'), index=False, header=False)
 
 
 def create_rwhar_dataset(raw_dir, save_dir):
@@ -328,7 +404,7 @@ def create_opportunity_dataset(raw_dir, save_dir):
     """
 
     # Hardcoded number of sensor channels employed in the OPPORTUNITY challenge
-    NB_SENSOR_CHANNELS = 113
+    NB_SENSOR_CHANNELS = 3
 
     # Hardcoded names of the files defining the OPPORTUNITY challenge data. As named in the original data.
     OPPORTUNITY_DATA_FILES = [  # Ordonez training
@@ -360,74 +436,6 @@ def create_opportunity_dataset(raw_dir, save_dir):
         (3, 'OpportunityUCIDataset/dataset/S4-ADL5.dat'),
         (3, 'OpportunityUCIDataset/dataset/S4-Drill.dat')
     ]
-
-    # Hardcoded thresholds to define global maximums and minimums for every one of the 113 sensor channels employed in the
-    # OPPORTUNITY challenge
-    NORM_MAX_THRESHOLDS = [3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000,
-                           3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000,
-                           3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000,
-                           3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000,
-                           3000, 3000, 3000, 10000, 10000, 10000, 1500, 1500, 1500,
-                           3000, 3000, 3000, 10000, 10000, 10000, 1500, 1500, 1500,
-                           3000, 3000, 3000, 10000, 10000, 10000, 1500, 1500, 1500,
-                           3000, 3000, 3000, 10000, 10000, 10000, 1500, 1500, 1500,
-                           3000, 3000, 3000, 10000, 10000, 10000, 1500, 1500, 1500,
-                           250, 25, 200, 5000, 5000, 5000, 5000, 5000, 5000,
-                           10000, 10000, 10000, 10000, 10000, 10000, 250, 250, 25,
-                           200, 5000, 5000, 5000, 5000, 5000, 5000, 10000, 10000,
-                           10000, 10000, 10000, 10000, 250, ]
-
-    NORM_MIN_THRESHOLDS = [-3000, -3000, -3000, -3000, -3000, -3000, -3000, -3000, -3000,
-                           -3000, -3000, -3000, -3000, -3000, -3000, -3000, -3000, -3000,
-                           -3000, -3000, -3000, -3000, -3000, -3000, -3000, -3000, -3000,
-                           -3000, -3000, -3000, -3000, -3000, -3000, -3000, -3000, -3000,
-                           -3000, -3000, -3000, -10000, -10000, -10000, -1000, -1000, -1000,
-                           -3000, -3000, -3000, -10000, -10000, -10000, -1000, -1000, -1000,
-                           -3000, -3000, -3000, -10000, -10000, -10000, -1000, -1000, -1000,
-                           -3000, -3000, -3000, -10000, -10000, -10000, -1000, -1000, -1000,
-                           -3000, -3000, -3000, -10000, -10000, -10000, -1000, -1000, -1000,
-                           -250, -100, -200, -5000, -5000, -5000, -5000, -5000, -5000,
-                           -10000, -10000, -10000, -10000, -10000, -10000, -250, -250, -100,
-                           -200, -5000, -5000, -5000, -5000, -5000, -5000, -10000, -10000,
-                           -10000, -10000, -10000, -10000, -250, ]
-
-    def select_columns_opp(data):
-        """Selection of the 113 columns employed in the OPPORTUNITY challenge
-        :param data: numpy integer matrix
-            Sensor data (all features)
-        :return: numpy integer matrix
-            Selection of features
-        """
-
-        #                     included-excluded
-        features_delete = np.arange(46, 50)
-        features_delete = np.concatenate([features_delete, np.arange(59, 63)])
-        features_delete = np.concatenate([features_delete, np.arange(72, 76)])
-        features_delete = np.concatenate([features_delete, np.arange(85, 89)])
-        features_delete = np.concatenate([features_delete, np.arange(98, 102)])
-        features_delete = np.concatenate([features_delete, np.arange(134, 243)])
-        features_delete = np.concatenate([features_delete, np.arange(244, 249)])
-        return np.delete(data, features_delete, 1)
-
-    def normalize(data, max_list, min_list):
-        """Normalizes all sensor channels
-        :param data: numpy integer matrix
-            Sensor data
-        :param max_list: numpy integer array
-            Array containing maximums values for every one of the 113 sensor channels
-        :param min_list: numpy integer array
-            Array containing minimum values for every one of the 113 sensor channels
-        :return:
-            Normalized sensor data
-        """
-        max_list, min_list = np.array(max_list), np.array(min_list)
-        diffs = max_list - min_list
-        for i in np.arange(data.shape[1]):
-            data[:, i] = (data[:, i] - min_list[i]) / diffs[i]
-        #     Checking the boundaries
-        data[data > 1] = 0.99
-        data[data < 0] = 0.00
-        return data
 
     def adjust_idx_labels(data_y, label):
         """Transforms original labels into the range [0, nb_labels-1]
@@ -473,19 +481,17 @@ def create_opportunity_dataset(raw_dir, save_dir):
         """
 
         # Select correct columns
-        data = select_columns_opp(data)
-        data = data[:, 1:]
+        x = data[:, 22:25]
+        locomotion = data[:, 243]
+        gestures = data[:, 249]
 
         # Perform linear interpolation
-        data[:, :113] = np.array([pd.Series(i).interpolate() for i in data[:, :113].T]).T
+        x = np.array([pd.Series(i).interpolate() for i in x.T]).T
 
         # Remaining missing data are converted to zero
-        data[:, :113][np.isnan(data[:, :113])] = 0
+        x[np.isnan(x)] = 0
 
-        # All sensor channels are normalized
-        data[:, :113] = normalize(data[:, :113], NORM_MAX_THRESHOLDS, NORM_MIN_THRESHOLDS)
-
-        return data
+        return np.concatenate((x, locomotion[:, None], gestures[:, None]), axis=1)
 
     def generate_data(dataset, target_folder):
         """Function to read the OPPORTUNITY challenge raw data and process all sensor channels
@@ -510,9 +516,6 @@ def create_opportunity_dataset(raw_dir, save_dir):
             except KeyError:
                 print('ERROR: Did not find {0} in zip file'.format(filename))
 
-        # Dataset is segmented into train and test
-        nb_test_samples = 676713
-
         print("Final dataset with size: {0} ".format(full.shape))
         # write full dataset
         full_data = pd.DataFrame(full, index=None)
@@ -522,10 +525,84 @@ def create_opportunity_dataset(raw_dir, save_dir):
         full_data[115] = adjust_idx_labels(full_data[115], 'gestures')
 
         full_data.to_csv(os.path.join(target_folder, 'opportunity_data.csv'), index=False, header=False)
-        # write Ordonez split
-        full_data.iloc[:nb_test_samples, :].to_csv(os.path.join(target_folder, 'opportunity_ordonez_data.csv'), index=False, header=False)
 
     generate_data(os.path.join(raw_dir, 'opportunity', 'OpportunityUCIDataset.zip'), save_dir)
+
+
+def create_hangtime_data(raw_dir, save_dir):
+    filenames = sorted(glob(os.path.join(raw_dir, 'hangtime', '*.csv')))
+    print(filenames)
+    for sbj, filename in enumerate(filenames):
+        sbj_data = pd.read_csv(filename)
+
+        sbj_game = sbj_data[(sbj_data['coarse'] == 'game')]
+        sbj_drill = sbj_data[(sbj_data['coarse'] != 'game') & (sbj_data['coarse'] != 'not_labeled')]
+        sbj_all = sbj_data[(sbj_data['coarse'] != 'not_labeled')]
+
+        tmp_output_game = sbj_game[['acc_x', 'axx_y', 'acc_z', 'basketball', 'locomotion']]
+        tmp_output_drill = sbj_drill[['acc_x', 'axx_y', 'acc_z', 'basketball', 'locomotion']]
+        tmp_output_all = sbj_all[['acc_x', 'axx_y', 'acc_z', 'basketball', 'locomotion']]
+
+        tmp_output_game['sbj'] = sbj
+        tmp_output_drill['sbj'] = sbj
+        tmp_output_all['sbj'] = sbj
+
+        if sbj == 0:
+            output_game = tmp_output_game[['sbj', 'acc_x', 'axx_y', 'acc_z', 'basketball', 'locomotion']]
+            output_drill = tmp_output_drill[['sbj', 'acc_x', 'axx_y', 'acc_z', 'basketball', 'locomotion']]
+            output_all = tmp_output_all[['sbj', 'acc_x', 'axx_y', 'acc_z', 'basketball', 'locomotion']]
+        else:
+            output_game = pd.concat((output_game, tmp_output_game[['sbj', 'acc_x', 'axx_y', 'acc_z', 'basketball', 'locomotion']]))
+            output_drill = pd.concat((output_drill, tmp_output_drill[['sbj', 'acc_x', 'axx_y', 'acc_z', 'basketball', 'locomotion']]))
+            output_all = pd.concat((output_all, tmp_output_all[['sbj', 'acc_x', 'axx_y', 'acc_z', 'basketball', 'locomotion']]))
+
+    output_all['locomotion'] = output_all['locomotion'].replace('not_labeled', 'null_class')
+    output_game['locomotion'] = output_game['locomotion'].replace('not_labeled', 'null_class')
+    output_drill['locomotion'] = output_drill['locomotion'].replace('not_labeled', 'null_class')
+
+    output_all['basketball'] = output_all['basketball'].replace('not_labeled', 'null_class')
+    output_game['basketball'] = output_game['basketball'].replace('not_labeled', 'null_class')
+    output_drill['basketball'] = output_drill['basketball'].replace('not_labeled', 'null_class')
+
+    print('LABEL DISTRIBUTION BASKETBALL: \n')
+    print('GAME: ')
+    print(output_game['basketball'].value_counts())
+    print('DRILL: ')
+    print(output_drill['basketball'].value_counts())
+    print('ALL: ')
+    print(output_all['basketball'].value_counts())
+
+    print('LABEL DISTRIBUTION LOCOMOTION: \n')
+    print('GAME: ')
+    print(output_game['locomotion'].value_counts())
+    print('DRILL: ')
+    print(output_drill['locomotion'].value_counts())
+    print('ALL: ')
+    print(output_all['locomotion'].value_counts())
+
+    output_game.to_csv(os.path.join(save_dir, 'hangtime_game_data.csv'), header=False, index=False)
+    output_drill.to_csv(os.path.join(save_dir, 'hangtime_drill_data.csv'), header=False, index=False)
+    output_all.to_csv(os.path.join(save_dir, 'hangtime_all_data.csv'), header=False, index=False)
+
+
+def create_walk_study_data(raw_dir, save_dir):
+    filenames = sorted(glob(os.path.join(raw_dir, 'walk_study', '*.csv')))
+    output = None
+
+    for sbj, filename in enumerate(filenames):
+        sbj_data = pd.read_csv(filename)[['acc_x', 'acc_y', 'acc_z', 'session_type']]
+        sbj_data['sbj'] = sbj
+
+        if output is None:
+            output = sbj_data[['sbj', 'acc_x', 'acc_y', 'acc_z', 'session_type']]
+        else:
+            output = pd.concat((output, sbj_data[['sbj', 'acc_x', 'acc_y', 'acc_z', 'session_type']]))
+
+    print('LABEL DISTRIBUTION: \n')
+    print('SESSION TYPE: ')
+    print(output['session_type'].value_counts())
+
+    output.to_csv(os.path.join(save_dir, 'walk_study_data.csv'), header=False, index=False)
 
 
 if __name__ == '__main__':
@@ -533,14 +610,20 @@ if __name__ == '__main__':
     save_path = '../data'
 
     # opportunity
-    create_opportunity_dataset(raw_path, save_path)
+    # create_opportunity_dataset(raw_path, save_path)
     # wetlab
-    feat = lambda streams: [s for s in streams if s.type == "audio"]
-    label = lambda streams: [s for s in streams if s.type == "subtitle"]
-    create_wetlab_data_from_mkvs(feat, label, raw_path, save_path, 50)
+    # feat = lambda streams: [s for s in streams if s.type == "audio"]
+    # label = lambda streams: [s for s in streams if s.type == "subtitle"]
+    # create_wetlab_data_from_mkvs(feat, label, raw_path, save_path, 50)
     # sbhar
-    create_sbhar_dataset(raw_path, save_path)
+    # create_sbhar_dataset(raw_path, save_path)
     # hhar
-    create_hhar_dataset(raw_path, save_path)
+    #create_hhar_dataset(raw_path, save_path)
     # rwhar
-    create_rwhar_dataset(raw_path, save_path)
+    # create_rwhar_dataset(raw_path, save_path)
+    # hangtime
+    create_hangtime_data(raw_path, save_path)
+    # seminar
+    # create_seminar_data(raw_path, save_path)
+    # walk_study
+    create_walk_study_data(raw_path, save_path)

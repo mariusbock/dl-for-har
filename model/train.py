@@ -151,7 +151,7 @@ class Maxup(torch.nn.Module):
         return loss, correct_preds
 
 
-def myNoiseAdditionAugmenter(x, y):
+def my_noise_addition_augmenter(x, y):
     """
     Noise augmenter for maxup loss
 
@@ -250,7 +250,7 @@ def init_scheduler(optimizer, config):
     return scheduler
 
 
-def train(train_features, train_labels, val_features, val_labels, network, optimizer, loss, config, log_date, log_timestamp, lr_scheduler=None):
+def train(train_features, train_labels, val_features, val_labels, network, optimizer, loss, config, log_dir=None, lr_scheduler=None):
     """
     Method to train a PyTorch network.
 
@@ -279,7 +279,6 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
     :return pytorch model, numpy array, numpy array
         Trained network and training and validation predictions with ground truth
     """
-    log_dir = os.path.join('logs', log_date, log_timestamp)
 
     # prints the number of learnable parameters in the network
     count_parameters(network)
@@ -308,7 +307,7 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
     opt, criterion = optimizer, loss
 
     if config['loss'] == 'maxup':
-        maxup = Maxup(myNoiseAdditionAugmenter, ntrials=4)
+        maxup = Maxup(my_noise_addition_augmenter, ntrials=4)
 
     # initialize training and validation dataset, define DataLoaders
     dataset = torch.utils.data.TensorDataset(torch.from_numpy(train_features), torch.from_numpy(train_labels))
@@ -331,6 +330,7 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
     best_train_preds = None
     early_stop = False
     es_pt_counter = 0
+    labels = list(range(0, config['nb_classes']))
 
     # training loop; iterates through epochs
     for e in range(config['epochs']):
@@ -432,23 +432,23 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
             # print epoch evaluation results for train and validation dataset
             print("EPOCH: {}/{}".format(e + 1, config['epochs']),
                   "\nTrain Loss: {:.4f}".format(np.mean(train_losses)),
-                  "Train Acc (M): {:.4f}".format(jaccard_score(train_gt, train_preds, average='macro')),
-                  "Train Prc (M): {:.4f}".format(precision_score(train_gt, train_preds, average='macro')),
-                  "Train Rcl (M): {:.4f}".format(recall_score(train_gt, train_preds, average='macro')),
-                  "Train F1 (M): {:.4f}".format(f1_score(train_gt, train_preds, average='macro')),
-                  "Train Acc (W): {:.4f}".format(jaccard_score(train_gt, train_preds, average='weighted')),
-                  "Train Prc (W): {:.4f}".format(precision_score(train_gt, train_preds, average='weighted')),
-                  "Train Rcl (W): {:.4f}".format(recall_score(train_gt, train_preds, average='weighted')),
-                  "Train F1 (W): {:.4f}".format(f1_score(train_gt, train_preds, average='weighted')),
+                  "Train Acc (M): {:.4f}".format(jaccard_score(train_gt, train_preds, average='macro', labels=labels)),
+                  "Train Prc (M): {:.4f}".format(precision_score(train_gt, train_preds, average='macro', labels=labels)),
+                  "Train Rcl (M): {:.4f}".format(recall_score(train_gt, train_preds, average='macro', labels=labels)),
+                  "Train F1 (M): {:.4f}".format(f1_score(train_gt, train_preds, average='macro', labels=labels)),
+                  "Train Acc (W): {:.4f}".format(jaccard_score(train_gt, train_preds, average='weighted', labels=labels)),
+                  "Train Prc (W): {:.4f}".format(precision_score(train_gt, train_preds, average='weighted', labels=labels)),
+                  "Train Rcl (W): {:.4f}".format(recall_score(train_gt, train_preds, average='weighted', labels=labels)),
+                  "Train F1 (W): {:.4f}".format(f1_score(train_gt, train_preds, average='weighted', labels=labels)),
                   "\nValid Loss: {:.4f}".format(np.mean(val_losses)),
-                  "Valid Acc (M): {:.4f}".format(jaccard_score(val_gt, val_preds, average='macro')),
-                  "Valid Prc (M): {:.4f}".format(precision_score(val_gt, val_preds, average='macro')),
-                  "Valid Rcl (M): {:.4f}".format(recall_score(val_gt, val_preds, average='macro')),
-                  "Valid F1 (M): {:.4f}".format(f1_score(val_gt, val_preds, average='macro')),
-                  "Valid Acc (W): {:.4f}".format(jaccard_score(val_gt, val_preds, average='weighted')),
-                  "Valid Prc (W): {:.4f}".format(precision_score(val_gt, val_preds, average='weighted')),
-                  "Valid Rcl (W): {:.4f}".format(recall_score(val_gt, val_preds, average='weighted')),
-                  "Valid F1 (W): {:.4f}".format(f1_score(val_gt, val_preds, average='weighted'))
+                  "Valid Acc (M): {:.4f}".format(jaccard_score(val_gt, val_preds, average='macro', labels=labels)),
+                  "Valid Prc (M): {:.4f}".format(precision_score(val_gt, val_preds, average='macro', labels=labels)),
+                  "Valid Rcl (M): {:.4f}".format(recall_score(val_gt, val_preds, average='macro', labels=labels)),
+                  "Valid F1 (M): {:.4f}".format(f1_score(val_gt, val_preds, average='macro', labels=labels)),
+                  "Valid Acc (W): {:.4f}".format(jaccard_score(val_gt, val_preds, average='weighted', labels=labels)),
+                  "Valid Prc (W): {:.4f}".format(precision_score(val_gt, val_preds, average='weighted', labels=labels)),
+                  "Valid Rcl (W): {:.4f}".format(recall_score(val_gt, val_preds, average='weighted', labels=labels)),
+                  "Valid F1 (W): {:.4f}".format(f1_score(val_gt, val_preds, average='weighted', labels=labels))
                   )
 
             # if chosen, print the value counts of the predicted labels for train and validation dataset
@@ -471,7 +471,7 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
 
         # employ early stopping if employed
         metric = f1_score(val_gt, val_preds, average='macro')
-        if best_metric > metric:
+        if best_metric >= metric:
             if config['early_stopping']:
                 es_pt_counter += 1
                 # early stopping check
@@ -482,15 +482,15 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
                     # print results of best epoch
                     print('Final (best) results: ')
                     print("Train Loss: {:.4f}".format(np.mean(best_train_losses)),
-                          "Train Acc: {:.4f}".format(jaccard_score(train_gt, best_train_preds, average='macro')),
-                          "Train Prec: {:.4f}".format(precision_score(train_gt, best_train_preds, average='macro')),
-                          "Train Rcll: {:.4f}".format(recall_score(train_gt, best_train_preds, average='macro')),
-                          "Train F1: {:.4f}".format(f1_score(train_gt, best_train_preds, average='macro')),
+                          "Train Acc: {:.4f}".format(jaccard_score(train_gt, best_train_preds, average='macro', labels=labels)),
+                          "Train Prec: {:.4f}".format(precision_score(train_gt, best_train_preds, average='macro', labels=labels)),
+                          "Train Rcll: {:.4f}".format(recall_score(train_gt, best_train_preds, average='macro', labels=labels)),
+                          "Train F1: {:.4f}".format(f1_score(train_gt, best_train_preds, average='macro', labels=labels)),
                           "Val Loss: {:.4f}".format(np.mean(best_val_losses)),
-                          "Val Acc: {:.4f}".format(jaccard_score(val_gt, best_val_preds, average='macro')),
-                          "Val Prec: {:.4f}".format(precision_score(val_gt, best_val_preds, average='macro')),
-                          "Val Rcll: {:.4f}".format(recall_score(val_gt, best_val_preds, average='macro')),
-                          "Val F1: {:.4f}".format(f1_score(val_gt, best_val_preds, average='macro')))
+                          "Val Acc: {:.4f}".format(jaccard_score(val_gt, best_val_preds, average='macro', labels=labels)),
+                          "Val Prec: {:.4f}".format(precision_score(val_gt, best_val_preds, average='macro', labels=labels)),
+                          "Val Rcll: {:.4f}".format(recall_score(val_gt, best_val_preds, average='macro', labels=labels)),
+                          "Val F1: {:.4f}".format(f1_score(val_gt, best_val_preds, average='macro', labels=labels)))
         else:
             print(f"Performance improved... ({best_metric}->{metric})")
             if config['early_stopping']:
@@ -518,7 +518,6 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
 
     # if plot_gradient gradient plot is shown at end of training
     if config['save_gradient_plot']:
-        mkdir_if_missing(log_dir)
         if config['name']:
             plt.savefig(os.path.join(log_dir, 'grad_flow_{}.png'.format(config['name'])))
         else:
@@ -540,7 +539,7 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
         return network, checkpoint, np.vstack((val_preds, val_gt)).T, np.vstack((train_preds, train_gt)).T
 
 
-def predict(test_features, test_labels, network, config, log_date, log_timestamp):
+def predict(test_features, test_labels, network, config, log_dir=None):
     """
     Method that applies a trained network to obtain predictions on a test dataset. If selected, saves predictions.
 
@@ -557,8 +556,6 @@ def predict(test_features, test_labels, network, config, log_date, log_timestamp
     :param log_timestamp: string
         Timestamp used for saving predictions
     """
-    log_dir = os.path.join('logs', log_date, log_timestamp)
-
     # set network to eval mode
     network.eval()
     # helper objects
@@ -589,20 +586,20 @@ def predict(test_features, test_labels, network, config, log_date, log_timestamp
             test_preds = np.concatenate((np.array(test_preds, int), np.array(y_preds, int)))
             test_gt = np.concatenate((np.array(test_gt, int), np.array(y_true, int)))
 
+    labels = list(range(0, config['nb_classes']))
     print('\nTEST RESULTS: ')
-    print("Avg. Accuracy: {0}".format(jaccard_score(test_gt, test_preds, average='macro')))
-    print("Avg. Precision: {0}".format(precision_score(test_gt, test_preds, average='macro')))
-    print("Avg. Recall: {0}".format(recall_score(test_gt, test_preds, average='macro')))
-    print("Avg. F1: {0}".format(f1_score(test_gt, test_preds, average='macro')))
+    print("Avg. Accuracy: {0}".format(jaccard_score(test_gt, test_preds, average='macro', labels=labels)))
+    print("Avg. Precision: {0}".format(precision_score(test_gt, test_preds, average='macro', labels=labels)))
+    print("Avg. Recall: {0}".format(recall_score(test_gt, test_preds, average='macro', labels=labels)))
+    print("Avg. F1: {0}".format(f1_score(test_gt, test_preds, average='macro', labels=labels)))
 
     print("\nTEST RESULTS (PER CLASS): ")
-    print("Accuracy: {0}".format(jaccard_score(test_gt, test_preds, average=None)))
-    print("Precision: {0}".format(precision_score(test_gt, test_preds, average=None)))
-    print("Recall: {0}".format(recall_score(test_gt, test_preds, average=None)))
-    print("F1: {0}".format(f1_score(test_gt, test_preds, average=None)))
+    print("Accuracy: {0}".format(jaccard_score(test_gt, test_preds, average=None, labels=labels)))
+    print("Precision: {0}".format(precision_score(test_gt, test_preds, average=None, labels=labels)))
+    print("Recall: {0}".format(recall_score(test_gt, test_preds, average=None, labels=labels)))
+    print("F1: {0}".format(f1_score(test_gt, test_preds, average=None, labels=labels)))
 
     if config['save_test_preds']:
-        mkdir_if_missing(log_dir)
         if config['name']:
             np.save(os.path.join(log_dir, 'test_preds_{}.npy'.format(config['name'])), test_output.cpu().numpy())
         else:

@@ -63,6 +63,17 @@ def load_dataset(dataset, pred_type='actions', include_null=False):
                            'drink_from_cup', 'toggle_switch']
         elif pred_type == 'locomotion':
             class_names = ['stand', 'walk', 'sit', 'lie']
+    elif dataset == 'hangtime_drill' or dataset == 'hangtime_game' or dataset == 'hangtime_all':
+        sampling_rate = 50
+        has_null = True
+        if pred_type == 'basketball':
+            class_names = ['dribbling', 'shot', 'pass', 'rebound', 'layup']
+        elif pred_type == 'locomotion':
+            class_names = ['walking', 'running', 'standing', 'sitting']
+    elif dataset == 'walk_study':
+        sampling_rate = 12.5
+        has_null = False
+        class_names = ['monitored', 'non_monitored']
 
     data = pd.read_csv(os.path.join('data/', dataset + '_data.csv'), sep=',', header=None, index_col=None)
     X, y = preprocess_data(data, dataset, pred_type, has_null, include_null)
@@ -102,16 +113,22 @@ def preprocess_data(data, ds, pt='actions', has_null=False, include_null=True):
         if include_null:
             pass
         else:
-            if (ds == 'wetlab' and pt == 'actions') or (ds == 'opportunity' and pt == 'locomotion'):
+            if (ds == 'wetlab' and pt == 'actions') or \
+                    ((ds == 'opportunity' or ds == 'opportunity_ordonez') and pt == 'locomotion') or \
+                    ((ds == 'hangtime_drill' or ds == 'hangtime_game' or ds == 'hangtime_all') and pt == 'basketball'):
                 data = data[(data.iloc[:, -2] != 'null_class')]
             elif ds == 'opportunity_ordonez':
                 pass
             else:
                 data = data[(data.iloc[:, -1] != 'null_class')]
 
-    if (ds == 'wetlab' and pt == 'actions') or ((ds == 'opportunity' or ds == 'opportunity_ordonez') and pt == "locomotion"):
+    if (ds == 'wetlab' and pt == 'actions') or \
+            ((ds == 'opportunity' or ds == 'opportunity_ordonez') and pt == "locomotion") or \
+            ((ds == 'hangtime_drill' or ds == 'hangtime_game' or ds == 'hangtime_all') and pt == 'basketball'):
         X, y = data.iloc[:, :-2], adjust_labels(data.iloc[:, -2], ds, pt).astype(int)
-    elif (ds == 'wetlab' and pt == 'tasks') or ((ds == 'opportunity' or ds == 'opportunity_ordonez') and pt == "gestures"):
+    elif (ds == 'wetlab' and pt == 'tasks') or \
+            ((ds == 'opportunity' or ds == 'opportunity_ordonez') and pt == "gestures") or \
+            ((ds == 'hangtime_drill' or ds == 'hangtime_game' or ds == 'hangtime_all') and pt == 'locomotion'):
         X, y = data.iloc[:, :-2], adjust_labels(data.iloc[:, -1], ds, pt).astype(int)
     else:
         X, y = data.iloc[:, :-1], adjust_labels(data.iloc[:, -1], ds, pt).astype(int)
@@ -224,7 +241,7 @@ def adjust_labels(data_y, dataset, pred_type='actions'):
         data_y[data_y == 'walk'] = 4
         data_y[data_y == 'stairsup'] = 5
         data_y[data_y == 'stairsdown'] = 6
-    elif dataset == 'opportunity' or 'opportunity_ordonez':
+    elif dataset == 'opportunity' or dataset == 'opportunity_ordonez':
         if pred_type == 'locomotion':
             data_y[data_y == "stand"] = 1
             data_y[data_y == "walk"] = 2
@@ -248,6 +265,21 @@ def adjust_labels(data_y, dataset, pred_type='actions'):
             data_y[data_y == 'clean_table'] = 15
             data_y[data_y == 'drink_from_cup'] = 16
             data_y[data_y == 'toggle_switch'] = 17
+    elif dataset == 'hangtime_drill' or dataset == 'hangtime_game' or dataset == 'hangtime_all':
+        if pred_type == 'basketball':
+            data_y[data_y == 'dribbling'] = 1
+            data_y[data_y == 'shot'] = 2
+            data_y[data_y == 'pass'] = 3
+            data_y[data_y == 'rebound'] = 4
+            data_y[data_y == 'layup'] = 5
+        elif pred_type == 'locomotion':
+            data_y[data_y == 'walking'] = 1
+            data_y[data_y == 'running'] = 2
+            data_y[data_y == 'standing'] = 3
+            data_y[data_y == 'sitting'] = 4
+    elif dataset == 'walk_study':
+        data_y[data_y == 'monitored'] = 0
+        data_y[data_y == 'non_monitored'] = 1
     return data_y
 
 
