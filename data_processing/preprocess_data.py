@@ -299,7 +299,7 @@ def get_last_non_nan(series, index, missingvalues=1):
     if not pd.isna(series[index - 1]):
         return series[index - 1], missingvalues
     else:
-        return get_last_non_nan(series, index - 1)
+        return get_last_non_nan(series, index - 1, missingvalues=missingvalues + 1)
 
 
 def get_next_non_nan(series, index, missingvalues=1):
