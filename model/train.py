@@ -250,7 +250,7 @@ def init_scheduler(optimizer, config):
     return scheduler
 
 
-def train(train_features, train_labels, val_features, val_labels, network, optimizer, loss, config, log_dir=None, lr_scheduler=None):
+def train(train_features, train_labels, val_features, val_labels, network, optimizer, loss, config, log_date, log_timestamp, lr_scheduler=None):
     """
     Method to train a PyTorch network.
 
@@ -539,7 +539,7 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
         return network, checkpoint, np.vstack((val_preds, val_gt)).T, np.vstack((train_preds, train_gt)).T
 
 
-def predict(test_features, test_labels, network, config, log_dir=None):
+def predict(test_features, test_labels, network, config, log_date, log_timestamp):
     """
     Method that applies a trained network to obtain predictions on a test dataset. If selected, saves predictions.
 
