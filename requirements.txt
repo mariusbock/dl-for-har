@@ -1,5 +1,5 @@
-torch==1.10.1
-numpy==1.21.5
+torch==1.13.1
+numpy==1.22
 scikit-learn==1.0.2
 matplotlib==3.5.1
 prettytable==3.0.0
