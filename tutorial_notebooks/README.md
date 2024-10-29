@@ -36,7 +36,7 @@ All notebooks are also possible to be run locally. To do so make sure that your 
 
 ## Citation
 ```
-  @article{bock2021improving,
+  @article{bock2021tutorial,
     author = {Bock, Marius and Hölzemann, Alexander and Moeller, Michael and Van Laerhoven, Kristof},
     title = {Tutorial on Deep Learning for Human Activity Recognition},
     year = {2021},
