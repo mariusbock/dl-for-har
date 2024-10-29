@@ -35,5 +35,14 @@ Note that these notebooks will have blanks, which you need to fill in! The links
 All notebooks are also possible to be run locally. To do so make sure that your Python distribution has all necessary packages installed which are mentioned in the `requirements.txt` of the main GitHub repository. Also make sure to set `use_colab=False` within the first code cell of each notebook. Using local deployment you will be also able to switch out the dataset which is loaded within the tutorial notebooks. To do so download the preprocessed datasets which work with the repository from [here](https://uni-siegen.sciebo.de/s/sMWQ2vJhDzM6sil) (PW: iswc21).
 
 ## Citation
-<a id="cite">Cite this work as: </a><br/> 
-Marius Bock, Alexander Hölzemann, Michael Moeller, and Kristof Van Laerhoven. 2021. Tutorial on Deep Learning for Human Activity Recognition. https://arxiv.org/abs/2110.06663
+```
+  @article{bock2021improving,
+    author = {Bock, Marius and Hölzemann, Alexander and Moeller, Michael and Van Laerhoven, Kristof},
+    title = {Tutorial on Deep Learning for Human Activity Recognition},
+    year = {2021},
+    journal = {CoRR},
+    volume = {abs/2110.06663},
+    doi = {10.48550/arXiv.2110.06663},
+    url = {https://arxiv.org/abs/2110.06663}
+}
+```
