@@ -9,6 +9,9 @@ Recent studies in Human Activity Recognition (HAR) have shown that Deep Learning
   <img width="" height="" src="images/architecture.png">
 </p>
 
+## YouTube video
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/fggty_qgZNA/0.jpg)](https://www.youtube.com/watch?v=fggty_qgZNA)
+
 ## Results
 Results were obtained on the Wetlab [[4]](#4), RWHAR [[6]](#6), SBHAR [[2]](#2) and HHAR [[5]](#5) dataset using LOSO cross-validation and Opportunity dataset [[3]](#3) using the train-test split as employed in [[1]](#1) averaged across 5 runs using a set of 5 different random seeds.
 
