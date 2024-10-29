@@ -9,6 +9,9 @@ Recent studies in Human Activity Recognition (HAR) have shown that Deep Learning
   <img width="" height="" src="images/architecture.png">
 </p>
 
+## YouTube Video
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/fggty_qgZNA/0.jpg)](https://www.youtube.com/watch?v=fggty_qgZNA)
+
 ## Results
 Results were obtained on the Wetlab [[4]](#4), RWHAR [[6]](#6), SBHAR [[2]](#2) and HHAR [[5]](#5) dataset using LOSO cross-validation and Opportunity dataset [[3]](#3) using the train-test split as employed in [[1]](#1) averaged across 5 runs using a set of 5 different random seeds.
 
@@ -102,8 +105,19 @@ Note that within the log files accuracy, precision, recall and F1-score inbetwee
 The results excel sheet (results.xlsx) contains all results mentioned within the paper and GitHub as well as aggregated information about the standard deviation across runs, per-class results and standard deviation across subjects.
 
 ## Citation
-<a id="cite">Cite this work as: </a><br/> 
-Marius Bock, Alexander Hölzemann, Michael Moeller, and Kristof Van Laerhoven. 2021. Improving Deep Learning for HAR with shallow LSTMs. In 2021 International Symposium on Wearable Computers (ISWC ’21), September 21–26, 2021, Virtual, USA. ACM, New York, NY, USA, 6 pages. https://doi.org/10.1145/3460421.3480419
+```
+  @inproceedings{bock2021improving,
+    author = {Bock, Marius and Hölzemann, Alexander and Moeller, Michael and Van Laerhoven, Kristof},
+    title = {Improving Deep Learning for HAR with Shallow LSTMs},
+    year = {2021},
+    booktitle = {Proceedings of the 2021 ACM International Symposium on Wearable Computers},
+    pages = {7–12},
+    numpages = {6},
+    doi = {10.1145/3460421.3480419},
+    url = {https://dl.acm.org/doi/10.1145/3460421.3480419}
+}
+
+```
 
 ## Dataset References
 <a id="1">[1]</a> 
